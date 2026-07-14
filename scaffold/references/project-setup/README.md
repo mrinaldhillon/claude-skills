@@ -111,11 +111,19 @@ would have shipped). Do this on a `chore/adopt-plugins` branch:
    ```
    - **Identical (pristine):** delete the vendored copy — the plugin now
      supplies it.
-   - **Differs (tuned):** **keep it.** A project-local hook overrides the
-     namespaced plugin hook by Claude Code's precedence rules, so a tuned hook
-     silently continues to work either way — but deleting it without reviewing
-     the diff throws away your tuning. Never delete a tuned file without
-     reading what it changed.
+   - **Differs (tuned):** If it differs (tuned), KEEP the file, but understand
+     what happens: Claude Code **merges** hooks — the plugin's `hooks.json`
+     version fires regardless of your project copy — so once you rewrite
+     `settings.json` to the complement, your kept tuned hook is wired by
+     nothing and no longer runs; the plugin's version runs instead. Treat the
+     kept copy as **reference only**: port its changes deliberately (upstream
+     them into the plugin, or accept the plugin default). Do NOT re-wire the
+     tuned copy in `settings.json` to "restore" it — that double-fires against
+     the plugin's hook (see the complement rule above). (This merge behaviour
+     is specific to **hooks**. Tuned project **skills** coexist with the
+     namespaced plugin ones, and a tuned **agent** of the same name wins by
+     project-over-plugin precedence — so those keep working with no re-wiring
+     concern.) Never delete a tuned file without reading what it changed.
 2. Enable `core` and `scaffold` (§1).
 3. Rewrite `.claude/settings.json` to the complement shape (§2): drop any
    wiring for hooks you deleted in step 1, keep `statusLine`, `context-nudge`,
