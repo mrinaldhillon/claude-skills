@@ -45,6 +45,7 @@ Add the marketplace once, then opt in from the project's `.claude/settings.json`
 | command | `/adr`                 | Scaffold the next ADR in `docs/decisions/` from `TEMPLATE.md` (mechanical; author fills the reasoning). |
 | command | `/goal`                | Dispatch a milestone build end-to-end via `milestone-workflow`. |
 | command | `/milestone`           | Generic per-milestone driver (copy into named `/m1`, `/m2`, … as milestones firm up). |
+| command | `/scaffold:milestone-run` | Prints the exact terminal command to run the milestone loop (resolves the plugin path); the runner itself (`scripts/milestone-runner.sh`) spawns fresh `claude -p` sessions, so it must run from a plain terminal, not nested in this session. |
 | agent   | `determinism-auditor`  | Advisory pre-scan for the five determinism/hot-path footguns; genericized (no `<PLACEHOLDER>`). Relevant only to projects with a replay/append-only invariant. Sonnet; terminal. |
 | hook    | `checkpoint`           | Stop + PreCompact: commit durable state (`.context/`, `docs/decisions/`) on non-`main` branches. No-ops when the substrate is absent; activates once you create `.context/` (see `references/project-setup/`). |
 | hook    | `subagent-trail`       | SubagentStop: append-only breadcrumb index of Agent-tool subagent transcripts for post-compaction recovery. |
@@ -72,11 +73,12 @@ conventions, and a migration checklist for existing starter-derived repos) and
 [`references/project-setup/`](references/project-setup) for the reference examples themselves
 (`settings.example.json`, `statusline.sh`, `context-nudge.sh`, the ADR/doc skeletons).
 
-`template-sync` remains obsoleted by plugin versioning: its job was to git-diff a project's *forked
-copies* of the shared steering layer against the upstream template tip, which is just
-`/plugin update` once that layer ships as versioned plugins. It should be dropped, not ported; only
-*substrate reconciliation* (a project's own `CLAUDE.md`/ADR-template/`.context` contracts vs current
-defaults) is a residual job, covered by the migration checklist above.
+The old cross-repo template-diff step remains obsoleted by plugin versioning: its job was to
+git-diff a project's *forked copies* of the shared steering layer against the upstream template
+tip, which is just `/plugin update` once that layer ships as versioned plugins. It should stay
+dropped, not ported; only *substrate reconciliation* (a project's own
+`CLAUDE.md`/ADR-template/`.context` contracts vs current defaults) is a residual job, covered by
+the migration checklist above.
 
 `scaffold` is usable in any repo that already has (or hand-creates, per the guide above) the
 `docs/` + `.context/` layout; the workflow skills, commands, hooks, and auditor all work standalone.

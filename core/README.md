@@ -2,8 +2,8 @@
 
 Cross-repo personal Claude Code layer — skills, agents, an output style, and universal guard hooks
 that apply to *any* project. This plugin holds only what is genuinely project-agnostic; repo-specific
-pins (branch-routing tables, named gates, milestone/ADR machinery, decisions of record) stay in each
-repo's own `.claude/` and `CLAUDE.md`, or in the `claude-code-starter` scaffolding template.
+pins (branch-routing tables, named gates, decisions of record) stay in each repo's own `.claude/` and
+`CLAUDE.md`; the milestone/ADR machinery lives one level up, in the sibling `scaffold` plugin.
 
 `orchestration` and `git-workflow` were extracted from handled-next's project skills; the four agents,
 the output style, and the two hooks were extracted from `claude-code-starter` — in both cases with the
@@ -31,19 +31,15 @@ Skills, agents, and output styles are auto-discovered from `skills/`, `agents/`,
 hooks load from `hooks/hooks.json`. The output style is registered via the `outputStyles` key in
 `plugin.json`; everything else is directory-layout-driven.
 
-### Deliberately NOT in core (belongs with `claude-code-starter`)
+### Deliberately NOT in core (ships in `scaffold` instead)
 
-These stay in the scaffolding template because they are coupled to per-project state a namespaced
-plugin cannot deliver, and would be dangling or misfiring if globalized:
-
-- **Commands** `/adr`, `/goal`, `/milestone` — need `docs/decisions/TEMPLATE.md`, `docs/playbooks/`,
-  and the `milestone-workflow` skill.
-- **Hooks** `checkpoint`, `context-nudge`, `subagent-trail`, `validate-config` — depend on
-  `.context/`, `.claude/state/` and the milestone/ADR conventions.
-- **Agent** `determinism-auditor` — an explicit fill-in-the-`<PLACEHOLDER>` template ("delete if
-  nothing in your project replays").
-- **Skills** `dev-workflow`, `milestone-workflow`, `project-bootstrap`, `skill-maintenance`,
-  `template-sync` — the per-project bootstrap/scaffold/sync machinery.
+The milestone/ADR/dev-loop machinery — the `/adr`/`/goal`/`/milestone`/`/scaffold:milestone-run`
+commands, the `checkpoint`/`subagent-trail`/`validate-config` hooks, the `determinism-auditor`
+agent, and the `dev-workflow`/`milestone-workflow`/`skill-maintenance` skills — ships in the
+[`scaffold`](../scaffold) plugin, not here: it is coupled to per-project state (`docs/`,
+`.context/`) that a project-agnostic plugin can't assume. See [`scaffold/README.md`](../scaffold)
+for the current inventory rather than duplicating it here (and for why `context-nudge` ships in
+neither plugin — it's project-local, see `scaffold/references/project-setup/`).
 
 ## Invocation
 
