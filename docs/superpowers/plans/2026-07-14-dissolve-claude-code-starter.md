@@ -361,14 +361,17 @@ overwrites it at each checkpoint. Keep it to one concrete step._
 ```
 (Do NOT copy the starter's `.context/project-context.md` / `RESUME.md` — those are the library's own build notes, not seeds.)
 
-- [ ] **Step 4: Author the seed ADRs (genericized) and pointer stubs**
+- [ ] **Step 4: Author the seed ADRs (genericized) + a one-line Summary + pointer stubs**
 
-Copy each seed ADR from `../claude-code-starter/docs/decisions/` into `templates/docs/decisions/`, stripping library-self-referential phrasing (e.g. rename `0002` title `# 2. Branch protection is by-discipline on the template` → `# 2. Branch protection is by-discipline`; remove any "on the template"/"claude-code-starter" wording and set `Status: Accepted`, `Date: <bootstrap fills>`). Seed set: `0000, 0001, 0002, 0005, 0007`.
+First, make ADRs cheaply scannable (runtime cost): edit `templates/docs/decisions/TEMPLATE.md` to add a `- **Summary:** <one sentence — the ruling, so a scan of titles+summaries suffices; open the body only to relitigate/supersede.>` as the **first** header bullet (above `**Status:**`).
+
+Copy each seed ADR from `../claude-code-starter/docs/decisions/` into `templates/docs/decisions/`, and to each add a one-line `- **Summary:**` header bullet capturing its ruling. Strip library-self-referential phrasing (e.g. rename `0002` title `# 2. Branch protection is by-discipline on the template` → `# 2. Branch protection is by-discipline`; remove any "on the template"/"claude-code-starter" wording; set `Status: Accepted`, `Date: <bootstrap fills>`). Seed set: `0000, 0001, 0002, 0005, 0007`.
 
 Create three pointer stubs. `templates/docs/decisions/0003-context-management-checkpoint-resume.md`:
 ```markdown
 # 3. Context management by checkpoint-resume, not compaction
 
+- **Summary:** Durable state lives in files; checkpoint before clearing. Machinery of record is in the scaffold plugin — see plugin reference.
 - **Status:** Accepted (machinery relocated)
 - **Date:** <bootstrap fills>
 - **Supersedes:** —
@@ -384,7 +387,7 @@ is retained to preserve append-only numbering. The project-level convention it i
 — durable state in files, checkpoint before clearing — is stated in `CLAUDE.md`
 §"Context & checkpoint protocol".
 ```
-Create `0004-*.md` and `0006-*.md` stubs with the same shape (titles `# 4. Context-managed milestone loop` and `# 6. Milestone permission profiles`, each pointing at `scaffold/references/decisions/000{4,6}-*.md`).
+Create `0004-*.md` and `0006-*.md` stubs with the same shape — including a one-line `**Summary:**` header bullet — (titles `# 4. Context-managed milestone loop` and `# 6. Milestone permission profiles`, each pointing at `scaffold/references/decisions/000{4,6}-*.md`).
 
 - [ ] **Step 5: Ship the full machinery ADRs as plugin reference**
 
@@ -398,7 +401,7 @@ cp ../claude-code-starter/docs/decisions/0006-*.md scaffold/references/decisions
 
 - [ ] **Step 6: Author the docs/ skeletons and CLAUDE.md skeleton**
 
-Copy `../claude-code-starter/docs/{README,design-notes,architecture,vocabulary,discipline}.md` → `templates/docs/`, leaving their `<PLACEHOLDER…>` markers intact (they are downstream-fill slots). Copy `../claude-code-starter/CLAUDE.md` → `templates/CLAUDE.md`, keeping the `# Commands` marker (`<PLACEHOLDER: fill from your build tool's task taxonomy — see the dev-workflow skill.>`) and the `# Architecture at a glance` marker verbatim; **remove** the top banner paragraph that describes the *library itself* (starter `CLAUDE.md:5-8`) and the "Developing the library itself" section — those are template-maintainer content, not project content.
+Copy `../claude-code-starter/docs/{README,design-notes,architecture,vocabulary,discipline}.md` → `templates/docs/`, leaving their `<PLACEHOLDER…>` markers intact (they are downstream-fill slots). Copy `../claude-code-starter/CLAUDE.md` → `templates/CLAUDE.md`, keeping the `# Commands` marker (`<PLACEHOLDER: fill from your build tool's task taxonomy — see the dev-workflow skill.>`) and the `# Architecture at a glance` marker verbatim; **remove** the top banner paragraph that describes the *library itself* (starter `CLAUDE.md:5-8`) and the "Developing the library itself" section — those are template-maintainer content, not project content. Then, in §"Context engineering", extend the "**Read `docs/decisions/`**" bullet with: *ADRs carry a one-line `**Summary:**` — scan titles + summaries to know what's decided; open a full ADR body only to relitigate or supersede a decision, not every session.* (This keeps ADR consultation cheap.)
 
 - [ ] **Step 7: Validate and commit**
 
