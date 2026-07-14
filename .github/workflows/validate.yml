@@ -1,0 +1,20 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: shellcheck
+        run: shellcheck scripts/*.sh core/hooks/*.sh scaffold/hooks/*.sh
+
+      - name: validate marketplace manifests and components
+        run: ./scripts/validate.sh
+
+      - name: test block-main-writes hook
+        run: ./scripts/test-block-main-writes.sh

@@ -9,9 +9,13 @@ concrete layout: `docs/decisions/` for ADRs, `docs/playbooks/<milestone>.md` for
 Enable it only in repos that use that layout — a namespaced plugin, so `scaffold:milestone-workflow`
 never shadows a repo's own tuned `milestone-workflow`.
 
-> **Requires `core`.** This is a hard dependency, not a suggestion: `milestone-workflow` and
-> `/milestone` dispatch the `code-reviewer` and `doc-sync` agents, which ship in `core`. Enable
-> `scaffold` without `core` and those references dangle.
+> **Requires `core`.** A hard dependency, declared in `plugin.json` (`"dependencies": ["core"]`), so
+> enabling `scaffold` auto-enables `core`. The coupling is real: `milestone-workflow` reaches for the
+> `code-reviewer` and `git-workflow` components; `/goal`, `/milestone`, and `skill-maintenance` reach
+> for `doc-sync`; and `/milestone` + `subagent-trail` name `orchestration` — all of which ship in
+> `core`. These are bare-name **prose** references (no literal `subagent_type` dispatch): they resolve
+> by description and let a repo's own tuned agent of the same name win, so they are intentionally not
+> `core:`-qualified.
 
 ## Enable per-project
 
