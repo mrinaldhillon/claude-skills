@@ -35,3 +35,11 @@ jobs:
 
       - name: test block-main-writes hook
         run: ./scripts/test-block-main-writes.sh
+      - name: test guard-secrets hook
+        run: ./scripts/test-guard-secrets.sh
+      - name: test checkpoint hook
+        run: ./scripts/test-checkpoint.sh
+      - name: test subagent-trail hook
+        run: ./scripts/test-subagent-trail.sh
+      - name: test validate-config hook
+        run: ./scripts/test-validate-config.sh
