@@ -1,0 +1,15 @@
+{
+  "name": "core",
+  "description": "Cross-repo personal skills + agent: cost-aware model delegation, tiered deep research, and the advisor-plus tier-up reviewer.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Mrinal Dhillon"
+  },
+  "keywords": [
+    "delegation",
+    "orchestration",
+    "research",
+    "advisor",
+    "code-review"
+  ]
+}

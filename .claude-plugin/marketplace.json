@@ -1,0 +1,14 @@
+{
+  "name": "mrinal-skills",
+  "description": "Mrinal Dhillon's portable personal Claude Code skills, grouped into installable plugins.",
+  "owner": {
+    "name": "Mrinal Dhillon"
+  },
+  "plugins": [
+    {
+      "name": "core",
+      "source": "./core",
+      "description": "Cross-repo personal skills + agent: cost-aware model delegation, tiered deep research, and the advisor-plus tier-up reviewer."
+    }
+  ]
+}
