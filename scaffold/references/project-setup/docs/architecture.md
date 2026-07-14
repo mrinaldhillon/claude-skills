@@ -1,6 +1,6 @@
 # Architecture
 
-> Skeleton from the claude-code-starter template. The **structure** doc: components,
+> Skeleton — replace with your project's content. The **structure** doc: components,
 > processes, repository layout, and the authoritative import/layering-boundary table.
 
 ## Components & processes

@@ -1,6 +1,6 @@
 # Design notes
 
-> Skeleton from the claude-code-starter template. This is the **reasoning** doc —
+> Skeleton — replace with your project's content. This is the **reasoning** doc —
 > the "why" behind every decision. `discipline.md` distills the "what" (the rules),
 > `architecture.md` the "how" (the structure). Write prose here; cite back to it with
 > `§` anchors from code and the other docs.
