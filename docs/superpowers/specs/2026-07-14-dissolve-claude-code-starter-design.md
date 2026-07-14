@@ -64,7 +64,7 @@ The naive framing ("where do the two leftover scripts live") is wrong: each coup
    - the **generator**: `/scaffold:bootstrap` command → `project-bootstrap` skill → bundled `templates/`;
    - the **runner**: `scripts/milestone-runner.sh` + `/scaffold:milestone-run` entry;
    - the **migration**: `/scaffold:adopt` command/skill;
-   - **plugin reference docs**: the *machinery-rationale* ADRs `0004` (milestone loop) + `0006` (permission profiles), and the `go-example` worked model;
+   - **plugin reference docs**: the *machinery-rationale* ADRs `0004` (milestone loop) + `0006` (permission profiles);
    - the **migrated tests** (§10).
 3. **Generated project substrate** (per bootstrapped repo, emitted by the generator): `.context/` seed + `README.md`; `milestones/example.json`; `docs/decisions/` seed ADRs — the *convention* ADRs `0000,0001,0002,0003,0005,0007` plus pointer stubs at `0004,0006` (§8) — and `TEMPLATE.md`; `docs/` skeletons; filled `CLAUDE.md`; `.claude/statusline.sh` + `.claude/context-nudge.sh`; and `.claude/settings.json` **complement** wiring (§6).
 
@@ -95,7 +95,7 @@ The naive framing ("where do the two leftover scripts live") is wrong: each coup
 Archiving `claude-code-starter` before these move loses live assets:
 
 - **Tests (8):** the 7 hook tests in `.claude/hooks/tests/` + `scripts/tests/milestone-runner_test.sh`. Migrate into `scaffold` (paths adjusted; the runner test's `checkpoint.sh` stub + realpath resolution updated) and wire into marketplace CI. Today, marketplace CI covers only `block-main-writes`; without migration the plugin copies of `checkpoint`/`subagent-trail`/`validate-config`/`guard-secrets` and the runner go untested.
-- **`go-example`** (6 files) is load-bearing: `bootstrap.md:19` uses it as the worked model for build-recipe generation. Bundle it as a plugin resource under the generator, or rewrite that step to not need it.
+- **`go-example` — dropped, not rehomed** (user decision, 2026-07-14). `bootstrap.md:19` currently uses it as the worked model for build-recipe generation, so the new `project-bootstrap` skill's build-recipe step must be **stack-discovery-driven with no bundled example** — the model writes build/CI/lint tooling from the interviewed/audited stack, not by mirroring a copied sample. Stack-specific recipes will instead arrive as **separate lang/tech plugins in this marketplace** later (§14). The go-example's own `.github/workflows/ci.yml` (the starter's only CI file) goes with it — no loss; it was example content.
 - **ADR split — by *nature*, not by number.** Classify each ADR as *project convention / decision-of-record* (seed) vs *plugin-machinery rationale* (plugin reference):
   - **Seed (conventions every project needs):** `0000` record-decisions, `0001` trunk-based, `0002` branch-protection-by-discipline, `0003` context-mgmt-by-checkpoint-resume (the discipline the generated `CLAUDE.md` §"Context & checkpoint protocol" states), `0005` agent-state-in-`.context/` (defines the layout the generator *creates*), `0007` annotate-superseded-in-place (**amends `0000` — must travel with it**, else a dangling amendment pointer).
   - **Plugin reference (machinery rationale that `/plugin update` owns):** `0004` context-managed milestone loop, `0006` milestone permission profiles — pure runner internals.
@@ -136,7 +136,7 @@ Idempotent; runs on a `chore/adopt-plugins` branch (§7.2).
 
 ## 13. Rollout sequence (phases → become the implementation plan)
 
-1. **Extract** (gating): migrate 8 tests + CI wiring; rehome `go-example`, ADRs `0003–0007`, orphans; land the correctness fixes (runner realpath).
+1. **Extract** (gating): migrate 8 tests + CI wiring; rehome the ADRs (by-nature split, §8) and orphans (§8); **drop `go-example`**; land the correctness fixes (runner realpath).
 2. **Build the runner relocation** + `/scaffold:milestone-run` entry.
 3. **Build the generator**: `project-bootstrap` skill + `/scaffold:bootstrap` + `templates/` (incl. `statusline.sh` + `context-nudge.sh` pair, seed convention ADRs + pointer stubs per §8, `.context/`, `CLAUDE.md`); enforce the complement invariant + branch-before-commit + re-entrancy (§7.5).
 4. **Build `/scaffold:adopt`** + its fixture test.
@@ -149,9 +149,10 @@ Idempotent; runs on a `chore/adopt-plugins` branch (§7.2).
 - Changing `core`'s contents or contract (only receives rehomed reference docs).
 - Public/third-party template distribution (audience is the single owner).
 - Reworking the milestone/ADR *conventions* themselves — only their placement changes.
+- **Stack-specific build recipes.** The `scaffold` generator stays **stack-agnostic** (fills placeholders via stack discovery, bundles no worked example). Language/tech-stack specifics — Go, Swift, etc. — will be delivered as **separate plugins in this marketplace** later, composed alongside `core`+`scaffold` per repo.
 
 ## 15. Open items to resolve during implementation (not design blockers)
 
 - Confirm `dependencies:["core"]` auto-enable behavior (§7.4).
-- Decide `go-example` rehome mechanism: bundled plugin resource vs. rewritten bootstrap step (§8).
+- Confirm the `project-bootstrap` build-recipe step works stack-agnostically with **no bundled example** (§8) — the one behavior change from dropping `go-example`.
 - Confirm the `/scaffold:milestone-run` foreground/background invocation model (§9).
