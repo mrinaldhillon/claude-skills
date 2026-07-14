@@ -28,7 +28,7 @@ jobs:
           shellcheck --version
 
       - name: shellcheck
-        run: shellcheck scripts/*.sh core/hooks/*.sh scaffold/hooks/*.sh scaffold/scripts/*.sh
+        run: shellcheck scripts/*.sh core/hooks/*.sh scaffold/hooks/*.sh scaffold/scripts/*.sh scaffold/references/project-setup/*.sh
 
       - name: validate marketplace manifests and components
         run: ./scripts/validate.sh
@@ -45,3 +45,7 @@ jobs:
         run: ./scripts/test-validate-config.sh
       - name: test milestone-runner
         run: ./scripts/test-milestone-runner.sh
+      - name: test statusline example
+        run: ./scripts/test-statusline.sh
+      - name: test context-nudge example
+        run: ./scripts/test-context-nudge.sh
