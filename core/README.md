@@ -1,27 +1,64 @@
 # core
 
-Cross-repo personal skills that apply to any project, plus one tier-up review agent. Repo-specific
-skills (e.g. handled-next's `orchestration`, `git-workflow`) deliberately stay in their own repo's
-`.claude/skills/` — this plugin holds only what is genuinely project-agnostic.
+Cross-repo personal Claude Code layer — skills, agents, an output style, and universal guard hooks
+that apply to *any* project. This plugin holds only what is genuinely project-agnostic; repo-specific
+pins (branch-routing tables, named gates, milestone/ADR machinery, decisions of record) stay in each
+repo's own `.claude/` and `CLAUDE.md`, or in the `claude-code-starter` scaffolding template.
+
+`orchestration` and `git-workflow` were extracted from handled-next's project skills; the four agents,
+the output style, and the two hooks were extracted from `claude-code-starter` — in both cases with the
+project-specific coupling stripped to portable defaults. Each repo's `CLAUDE.md`/`.claude/` may still
+override or extend these (e.g. a stricter branch-routing decision of record, a tuned reviewer).
 
 ## Contents
 
-| Kind  | Name                     | What it does |
-|-------|--------------------------|--------------|
-| skill | `cost-aware-delegation`  | Routes mechanical, low-judgment work to a cheaper Sonnet subagent; keeps judgment-heavy work on the strong model; verifies delegated output. |
-| skill | `deep-research-tiered`   | Tiered, budget-guarded, checkpointed fan-out research (web search → fetch → verify → synthesize) with per-stage model pins. |
-| agent | `advisor-plus`           | Tier-up second opinion on the main loop's own work (designs, plans, diffs). Caller selects the model one tier above the session model. |
+| Kind         | Name                     | What it does |
+|--------------|--------------------------|--------------|
+| skill        | `cost-aware-delegation`  | Routes mechanical, low-judgment work to a cheaper Sonnet subagent; keeps judgment-heavy work on the strong model; verifies delegated output. |
+| skill        | `orchestration`          | The full tiered orchestrator-worker fan-out model behind `cost-aware-delegation`: per-stage model pins, budget guard, workers-vs-critics, deterministic gates outrank LLM judges, coupled-write single-threading. |
+| skill        | `git-workflow`           | Trunk-based GitHub Flow: branch off main → PR → gates green → rebase-merge → delete; delegate CI-waits/gh ops to a Sonnet subagent, keep the merge decision on main. |
+| skill        | `deep-research-tiered`   | Tiered, budget-guarded, checkpointed fan-out research (web search → fetch → verify → synthesize) with per-stage model pins. |
+| agent        | `advisor-plus`           | Tier-up second opinion on the main loop's own work (designs, plans, diffs). Caller selects the model one tier above the session model. |
+| agent        | `code-reviewer`          | Read-only correctness/security/discipline review of a diff or package; severity-ordered `file:line` findings. Opus-pinned; terminal (consults no one). |
+| agent        | `search`                 | Read-only code/doc search-and-locate on Sonnet; returns `file:line` anchors, not file dumps. A cheaper, terminal alternative to built-in `Explore`. |
+| agent        | `doc-sync`               | Checks code-vs-docs/spec drift and that discoveries were written back in the same PR; proposes surgical doc/ADR edits. Sonnet. |
+| agent        | `config-auditor`         | Audits the `.claude/` steering layer itself — frontmatter validity, model-tier consistency, dangling skill/agent/command/hook refs, broken cross-links. Sonnet; read-only. |
+| output style | `distinguished-engineer` | Terse principal-engineer voice: verify-before-assert, no fabricated APIs, failure-mode/security reasoning by default, self-review before "done". Available, **not** force-applied. |
+| hook         | `block-main-writes`      | PreToolUse(Bash): denies `git commit`/`merge`/`push` while the checkout is on `main` (trunk-based backstop). |
+| hook         | `guard-secrets`          | PreToolUse(Read\|Edit\|Write): denies file-tool access to secret material (`.env`, `*.key`, `*.pem`, `secrets/…`, `*.local`, …) so key bytes never enter context. |
 
-Skills and the agent are auto-discovered from `skills/` and `agents/` — they are **not** listed in
-`plugin.json`; the directory layout is the source of truth.
+Skills, agents, and output styles are auto-discovered from `skills/`, `agents/`, and `output-styles/`;
+hooks load from `hooks/hooks.json`. The output style is registered via the `outputStyles` key in
+`plugin.json`; everything else is directory-layout-driven.
+
+### Deliberately NOT in core (belongs with `claude-code-starter`)
+
+These stay in the scaffolding template because they are coupled to per-project state a namespaced
+plugin cannot deliver, and would be dangling or misfiring if globalized:
+
+- **Commands** `/adr`, `/goal`, `/milestone` — need `docs/decisions/TEMPLATE.md`, `docs/playbooks/`,
+  and the `milestone-workflow` skill.
+- **Hooks** `checkpoint`, `context-nudge`, `subagent-trail`, `validate-config` — depend on
+  `.context/`, `.claude/state/` and the milestone/ADR conventions.
+- **Agent** `determinism-auditor` — an explicit fill-in-the-`<PLACEHOLDER>` template ("delete if
+  nothing in your project replays").
+- **Skills** `dev-workflow`, `milestone-workflow`, `project-bootstrap`, `skill-maintenance`,
+  `template-sync` — the per-project bootstrap/scaffold/sync machinery.
 
 ## Invocation
 
 Once installed from the `mrinal-skills` marketplace, components are namespaced:
 
 - Skills auto-trigger by their `description` exactly as user-level skills do — the namespace does not
-  change that. Explicit slash form: `/core:cost-aware-delegation`, `/core:deep-research-tiered`.
-- Agent: dispatch as subagent type `core:advisor-plus`.
+  change that. Explicit slash form: `/core:cost-aware-delegation`, `/core:orchestration`,
+  `/core:git-workflow`, `/core:deep-research-tiered`.
+- Agents: dispatch as subagent type `core:advisor-plus`, `core:code-reviewer`, `core:search`,
+  `core:doc-sync`, `core:config-auditor`. (Agents resolve project-over-user, so a repo's own tuned
+  agent of the same name still wins.)
+- Output style: select `distinguished-engineer` via `/output-style` — it is **not** `force-for-plugin`,
+  so enabling core never silently overrides your active style.
+- Hooks activate automatically when the plugin is enabled; they **merge** with your user/project hooks
+  (identical handlers are de-duplicated). Override either via `/hooks`.
 
 > **Migration note:** any prose that references these by bare name (e.g. `~/.claude/CLAUDE.md`'s
 > "the `cost-aware-delegation` skill", "the `advisor-plus` agent") keeps working because

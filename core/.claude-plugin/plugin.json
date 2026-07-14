@@ -1,15 +1,19 @@
 {
   "name": "core",
-  "description": "Cross-repo personal skills + agent: cost-aware model delegation, tiered deep research, and the advisor-plus tier-up reviewer.",
-  "version": "0.1.0",
+  "description": "Cross-repo personal Claude Code layer: skills (cost-aware delegation, orchestrator-worker fan-out, trunk-based git workflow, tiered deep research), review/search/doc agents, the distinguished-engineer output style, and universal git/secret guard hooks.",
+  "version": "0.3.0",
   "author": {
     "name": "Mrinal Dhillon"
   },
   "keywords": [
     "delegation",
     "orchestration",
+    "git-workflow",
     "research",
     "advisor",
-    "code-review"
-  ]
+    "code-review",
+    "hooks",
+    "output-style"
+  ],
+  "outputStyles": "./output-styles/"
 }
