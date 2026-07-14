@@ -8,7 +8,12 @@
     {
       "name": "core",
       "source": "./core",
-      "description": "Cross-repo personal skills + agent: cost-aware model delegation, tiered deep research, and the advisor-plus tier-up reviewer."
+      "description": "Cross-repo personal Claude Code layer: skills (cost-aware delegation, orchestrator-worker fan-out, trunk-based git workflow, tiered deep research), review/search/doc agents, the distinguished-engineer output style, and universal git/secret guard hooks."
+    },
+    {
+      "name": "scaffold",
+      "source": "./scaffold",
+      "description": "Project-enabled scaffolding layer: milestone/dev/skill-maintenance workflows, ADR + milestone commands, context-checkpoint & config-guard hooks, and a determinism auditor. Enable per-repo; pairs with core."
     }
   ]
 }
