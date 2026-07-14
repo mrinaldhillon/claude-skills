@@ -93,6 +93,8 @@ claude-skills/
     ├── commands/<name>.md
     ├── agents/<name>.md
     ├── hooks/hooks.json + *.sh
+    ├── scripts/                       # milestone-runner.sh
+    ├── references/                    # decisions/ (machinery ADRs) + project-setup/ (adoption docs)
     └── README.md
 ```
 

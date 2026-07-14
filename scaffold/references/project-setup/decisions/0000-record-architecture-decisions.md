@@ -2,7 +2,7 @@
 
 - **Summary:** Decisions are recorded as append-only ADRs in `docs/decisions/`; supersede via a new ADR, never edit an Accepted one's meaning.
 - **Status:** Accepted
-- **Date:** <bootstrap fills>
+- **Date:** <fill on adoption>
 - **Amended by:** 0007 (partial supersession is annotated at the affected clause)
 
 ## Context

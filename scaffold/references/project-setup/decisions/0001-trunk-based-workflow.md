@@ -2,7 +2,7 @@
 
 - **Summary:** `main` is the only long-lived branch — trunk-based, PR-into-main, rebase-merge, green-to-merge; no develop/release branches.
 - **Status:** Accepted
-- **Date:** <bootstrap fills>
+- **Date:** <fill on adoption>
 - **Supersedes:** —
 - **Superseded by:** [0002](0002-branch-protection-by-discipline.md) — branch-protection clause only; the rest of this ADR remains in force
 

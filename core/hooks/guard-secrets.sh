@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # PreToolUse guard (Read|Edit|Write): deny access to secret material so key/
 # token bytes never enter the model context, get edited, or get written to a
-# log. The default globs mirror this template's .gitignore Secrets block plus
-# the conventional key/cert suffixes; /bootstrap should EXTEND the globs from
-# the project's own .gitignore Secrets block (a pattern gitignored as secret
+# log. The default globs cover common .gitignore Secrets-block patterns plus
+# the conventional key/cert suffixes; extend them per-project from the
+# project's own .gitignore Secrets block (a pattern gitignored as secret
 # should also be unreadable to the model).
 # Deny is expressed as PreToolUse permissionDecision JSON on stdout, exit 0.
 # NOTE: this guards the file tools only; it does not parse Bash (e.g. `cat .env`).
