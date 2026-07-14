@@ -37,7 +37,7 @@ The milestone/ADR/dev-loop machinery — the `/adr`/`/goal`/`/milestone`/`/scaff
 commands, the `checkpoint`/`subagent-trail`/`validate-config` hooks, the `determinism-auditor`
 agent, and the `dev-workflow`/`milestone-workflow`/`skill-maintenance` skills — ships in the
 [`scaffold`](../scaffold) plugin, not here: it is coupled to per-project state (`docs/`,
-`.context/`) that a project-agnostic plugin can't assume. See [`scaffold/README.md`](../scaffold)
+`.context/`) that a project-agnostic plugin can't assume. See [`scaffold/README.md`](../scaffold/README.md)
 for the current inventory rather than duplicating it here (and for why `context-nudge` ships in
 neither plugin — it's project-local, see `scaffold/references/project-setup/`).
 

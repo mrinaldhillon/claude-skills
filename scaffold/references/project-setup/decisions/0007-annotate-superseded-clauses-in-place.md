@@ -2,7 +2,7 @@
 
 - **Summary:** A superseding ADR that replaces only part of an older record must also annotate the affected clause in place with a pointer, in addition to the header stamp.
 - **Status:** Accepted
-- **Date:** <bootstrap fills>
+- **Date:** <fill on adoption>
 - **Supersedes:** — (amends the process rule in 0000)
 - **Superseded by:** —
 

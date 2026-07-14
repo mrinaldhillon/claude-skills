@@ -2,7 +2,7 @@
 
 - **Summary:** Milestone runs pick a permission profile (strict / sandboxed auto / containment-gated bypass) scoped to risk. Machinery of record is in the scaffold plugin — see plugin reference.
 - **Status:** Accepted (machinery relocated)
-- **Date:** <bootstrap fills>
+- **Date:** <fill on adoption>
 - **Supersedes:** —
 - **Superseded by:** —
 

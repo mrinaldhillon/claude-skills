@@ -2,7 +2,7 @@
 
 - **Summary:** Long milestones run as session-chosen chunks behind deterministic gates, checkpointing between chunks. Machinery of record is in the scaffold plugin — see plugin reference.
 - **Status:** Accepted (machinery relocated)
-- **Date:** <bootstrap fills>
+- **Date:** <fill on adoption>
 - **Supersedes:** —
 - **Superseded by:** —
 

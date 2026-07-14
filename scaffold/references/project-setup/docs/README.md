@@ -29,7 +29,6 @@ The repo root also carries **`CLAUDE.md`** (instructions for Claude Code) and
 | `architecture.md` | Components, processes, layout, import/layering boundaries |
 | `vocabulary.md` | Terms that are easy to misread, with the misunderstanding each prevents |
 | `decisions/` | Append-only ADRs (one decision per file; never edited, only superseded) |
-| `meta/` | Template-maintainer notes (why the template is built this way). **Delete on bootstrap** — see `meta/README.md`. |
 
 Agent-written project state — `project-context.md` (current milestone, active
 workstream, recent decisions, open questions) and `RESUME.md` (one-line resume

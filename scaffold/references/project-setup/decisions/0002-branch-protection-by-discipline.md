@@ -2,7 +2,7 @@
 
 - **Summary:** `main` protection is a documented target, enforced by discipline (not GitHub) until this project configures it.
 - **Status:** Accepted
-- **Date:** <bootstrap fills>
+- **Date:** <fill on adoption>
 - **Supersedes:** the branch-protection clause of [0001](0001-trunk-based-workflow.md)
 - **Superseded by:** —
 

@@ -55,9 +55,7 @@ mkrepo() { # mkrepo <name> [branch] → prints repo path, cds NOT done here
   local d="$CASES/$1" b="${2:-feat-test}"
   mkdir -p "$d"; ( cd "$d" || exit 1
     git init -q -b "$b"; git config user.email t@t; git config user.name t
-    mkdir -p docs .context .claude/hooks
-    printf '#!/usr/bin/env bash\nexit 0\n' > .claude/hooks/checkpoint.sh
-    chmod +x .claude/hooks/checkpoint.sh
+    mkdir -p docs .context
     echo ctx > .context/project-context.md; echo ptr > .context/RESUME.md )
   printf '#!/usr/bin/env bash\nexit 0\n' > "$d/checkpoint-stub.sh"
   chmod +x "$d/checkpoint-stub.sh"

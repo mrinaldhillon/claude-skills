@@ -64,12 +64,16 @@ the `checkpoint` hook on non-main branches only. Those two seed files aren't
 included here — they're created by your project on its first checkpoint; the
 convention doc is enough to bootstrap them.
 
+Add `.context/MILESTONE_DONE`, `.context/REPLAN.md`, and `.claude/state/` to
+your project's `.gitignore` — they're per-run/machine-local, per
+`context/README.md`.
+
 Adopt the ADR baseline in [`decisions/`](decisions/): copy
 [`TEMPLATE.md`](decisions/TEMPLATE.md) plus the seed ADRs `0000`, `0001`,
-`0002`, `0005`, `0007`. The pointer stubs `0003`, `0004`, `0006` delegate the
-milestone/checkpoint machinery's rationale to the plugin — copy them too to
-preserve append-only numbering, but the full text of record lives in
-[`../decisions/`](../decisions/) (versioned with the plugin, not your project).
+`0002`, `0007`. The pointer stubs `0003`, `0004`, `0005`, `0006` delegate the
+milestone/checkpoint/agent-state machinery's rationale to the plugin — copy
+them too to preserve append-only numbering, but the full text of record lives
+in [`../decisions/`](../decisions/) (versioned with the plugin, not your project).
 ADRs carry a one-line `**Summary:**` — scan those; open a body only to
 relitigate or supersede a decision.
 
@@ -111,8 +115,8 @@ would have shipped). Do this on a `chore/adopt-plugins` branch:
    ```
    - **Identical (pristine):** delete the vendored copy — the plugin now
      supplies it.
-   - **Differs (tuned):** If it differs (tuned), KEEP the file, but understand
-     what happens: Claude Code **merges** hooks — the plugin's `hooks.json`
+   - **Differs (tuned):** KEEP the file, but understand what happens:
+     Claude Code **merges** hooks — the plugin's `hooks.json`
      version fires regardless of your project copy — so once you rewrite
      `settings.json` to the complement, your kept tuned hook is wired by
      nothing and no longer runs; the plugin's version runs instead. Treat the
