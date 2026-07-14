@@ -1,6 +1,6 @@
 {
   "name": "scaffold",
-  "description": "Project-enabled scaffolding layer: milestone/dev/skill-maintenance workflows, ADR + milestone commands, context-checkpoint & config-guard hooks, and a determinism auditor. Enable per-repo in .claude/settings.json — assumes the docs/ + .context/ layout it establishes.",
+  "description": "Project-enabled scaffolding layer: milestone/dev/skill-maintenance workflows, ADR + milestone commands, context-checkpoint & config-guard hooks, and a determinism auditor. Enable per-repo in .claude/settings.json; requires the core plugin and assumes the docs/ + .context/ layout it establishes.",
   "version": "0.1.0",
   "author": {
     "name": "Mrinal Dhillon"
@@ -12,5 +12,6 @@
     "bootstrap",
     "checkpoint",
     "scaffolding"
-  ]
+  ],
+  "dependencies": ["core"]
 }
