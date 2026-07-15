@@ -32,7 +32,7 @@ once or on drift).
 Commands table, give each target a `Live when` cell: **now**, or the concrete
 milestone/artifact it waits on (e.g. "needs `internal/replay` (M1b)"). It tells a
 fresh session what is real today vs. aspirational, and each cell flips to **now** in
-the milestone-completion doc sweep (`milestone-workflow` step 6) — a stale cell is
+the milestone-completion doc sweep (`milestone-workflow` step 5) — a stale cell is
 doc drift, not a placeholder.
 
 **Pinned external dependency (opt-in local-checkout):** the default build uses the
