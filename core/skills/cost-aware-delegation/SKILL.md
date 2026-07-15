@@ -35,6 +35,33 @@ answer here is cheap to catch:
 
 When unsure, lean to quality: do the thinking on the strong model, hand off only the typing.
 
+## Turn count beats token price — Sonnet is the floor
+
+> **Adopted from `superpowers:subagent-driven-development` § Model Selection** — the
+> insight, the 2–3× figure, and the mid-tier-floor rule are theirs, not this skill's.
+> Cite it, don't re-derive it. This section exists because that guidance fires only
+> *inside* subagent-driven-development, while this skill is the always-on policy.
+
+Per-token price is not per-task cost. **Wall-clock and context cost scale with how many
+turns a subagent takes**, and the cheapest tier routinely takes 2–3× the turns on
+multi-step work — a Haiku that flails through six turns costs more than a Sonnet that
+lands in two, and burns your context re-reading its own mistakes. So:
+
+- **Sonnet is the subagent floor** for anything multi-step — reviewers, and implementers
+  working from *prose* rather than transcription-ready text.
+- **Drop to Haiku only when the task is genuinely single-pass**: the values are already
+  given and the work is transcription, lookup, scraping, or polling.
+
+The Haiku row above is a floor exception, not the default. Tiering down past Sonnet on
+work that needs iteration is a false economy in the same way rubber-stamped verification
+is.
+
+**This does not contradict the Haiku pins in `orchestration` and `deep-research-tiered`.**
+Those stages — search, page fetch + extract, log scraping, status polling — are
+single-pass *by construction*: one page in, one extraction out, no iteration to
+multiply. They are the floor exception this section describes, not multi-step work.
+The floor binds where a subagent must *loop* to converge.
+
 ## How to delegate well
 
 1. Give the cheap subagent a **precise, self-contained spec** — exact file paths, the

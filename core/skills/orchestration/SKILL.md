@@ -123,11 +123,10 @@ Main backstops its own design with `advisor`.
   For *coupled implementation* — multiple files that must agree on shared decisions
   (types, naming, edge cases) — keep writes **single-threaded: one writer**, with
   other agents adding intelligence *around* it. Parallel writers make conflicting
-  implicit choices that degrade coherence.
-- **Pack the worker's context into the prompt — it starts blind.** The only
-  parent→subagent channel is the prompt string; a subagent does not inherit your
-  history, read files, or invoked skills (custom subagents do load CLAUDE.md +
-  memory, but task-specific constraints must be restated).
+  implicit choices that degrade coherence. This is a *coherence* argument, distinct
+  from `dispatching-parallel-agents`' "don't parallelize agents that would edit the
+  same files" — coupled writers corrupt the design even when they never touch the
+  same file.
 - File-mutating parallel subagents run in **isolated git worktrees**
   (`isolation: worktree`). **Caveat:** a worktree branches from the **default
   branch, not the parent's HEAD** — workers see neither your uncommitted work nor
@@ -135,10 +134,27 @@ Main backstops its own design with `advisor`.
 - Subagents report a **verdict only** (no log dumps); verbose build/CI output stays
   out of the main context.
 - **No independent merges.** Main reviews the full diff and runs the gates before
-  merging each branch.
-- Give every subagent an **objective + output format + clear task boundaries**.
-  The synchronous-merge bottleneck (main waits on the slowest subagent) is accepted
-  for simplicity.
+  merging each branch. The synchronous-merge bottleneck (main waits on the slowest
+  subagent) is accepted for simplicity.
+
+## Prompt craft is not here — use `superpowers:dispatching-parallel-agents`
+
+How to *write* the dispatch — pack the full context because the agent starts blind
+and never inherits your history, give it scope + goal + constraints + expected output
+format, then review and integrate what comes back — is
+`superpowers:dispatching-parallel-agents`. It says it well; this skill does not
+restate it.
+
+What that skill has no notion of, and this one exists for: **model tiering**
+(`opts.model` per stage, the Haiku/Sonnet/strong table above), the **budget** guard,
+**checkpointing before loss**, **worktree branch-point semantics**, and the
+**workers-vs-critics consult rule**. Read both: that one for the prompt, this one for
+which model runs it and what it costs.
+
+One Claude-Code specific it doesn't carry: "starts blind" is not absolute — a
+**custom subagent still loads CLAUDE.md + memory**; it is your *task-specific*
+constraints that must be restated. The sole parent→child channel remains the prompt
+string, and only the child's final message returns (see Grounding).
 
 ## Gotchas
 

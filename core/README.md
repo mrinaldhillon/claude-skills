@@ -14,9 +14,9 @@ override or extend these (e.g. a stricter branch-routing decision of record, a t
 
 | Kind         | Name                     | What it does |
 |--------------|--------------------------|--------------|
-| skill        | `cost-aware-delegation`  | Routes mechanical, low-judgment work to a cheaper Sonnet subagent; keeps judgment-heavy work on the strong model; verifies delegated output. |
-| skill        | `orchestration`          | The full tiered orchestrator-worker fan-out model behind `cost-aware-delegation`: per-stage model pins, budget guard, workers-vs-critics, deterministic gates outrank LLM judges, coupled-write single-threading. |
-| skill        | `git-workflow`           | Trunk-based GitHub Flow: branch off main → PR → gates green → rebase-merge → delete; delegate CI-waits/gh ops to a Sonnet subagent, keep the merge decision on main. |
+| skill        | `cost-aware-delegation`  | Routes mechanical, low-judgment work to a cheaper Sonnet subagent; keeps judgment-heavy work on the strong model; verifies delegated output. **Sonnet is the subagent floor** — turn count beats token price. |
+| skill        | `orchestration`          | The full tiered orchestrator-worker fan-out model behind `cost-aware-delegation`: per-stage model pins, budget guard, workers-vs-critics, deterministic gates outrank LLM judges, coupled-write single-threading. Prompt craft defers to `superpowers:dispatching-parallel-agents`. |
+| skill        | `git-workflow`           | Trunk-based GitHub Flow: branch off main → PR → gates green → rebase-merge → delete; delegate CI-waits/gh ops to a Sonnet subagent, keep the merge decision on main. Documents its conflict with `superpowers:finishing-a-development-branch`. |
 | skill        | `deep-research-tiered`   | Tiered, budget-guarded, checkpointed fan-out research (web search → fetch → verify → synthesize) with per-stage model pins. |
 | agent        | `advisor-plus`           | Tier-up second opinion on the main loop's own work (designs, plans, diffs). Caller selects the model one tier above the session model. |
 | agent        | `code-reviewer`          | Read-only correctness/security/discipline review of a diff or package; severity-ordered `file:line` findings. Opus-pinned; terminal (consults no one). |
@@ -33,9 +33,9 @@ hooks load from `hooks/hooks.json`. The output style is registered via the `outp
 
 ### Deliberately NOT in core (ships in `scaffold` instead)
 
-The milestone/ADR/dev-loop machinery — the `/adr`/`/goal`/`/milestone`/`/scaffold:milestone-run`
+The milestone/ADR machinery — the `/adr`/`/goal`/`/milestone`/`/scaffold:milestone-run`
 commands, the `checkpoint`/`subagent-trail`/`validate-config` hooks, the `determinism-auditor`
-agent, and the `dev-workflow`/`milestone-workflow`/`skill-maintenance` skills — ships in the
+agent, and the `milestone-workflow`/`skill-maintenance` skills — ships in the
 [`scaffold`](../scaffold) plugin, not here: it is coupled to per-project state (`docs/`,
 `.context/`) that a project-agnostic plugin can't assume. See [`scaffold/README.md`](../scaffold/README.md)
 for the current inventory rather than duplicating it here (and for why `context-nudge` ships in

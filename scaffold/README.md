@@ -1,6 +1,6 @@
 # scaffold
 
-The **project-enabled** half of the personal Claude Code layer — the milestone/ADR/dev-loop machinery
+The **project-enabled** half of the personal Claude Code layer — the milestone/ADR machinery
 extracted from `claude-code-starter`. Where [`core`](../core) is broadly/globally enabled and
 project-agnostic, `scaffold` is meant to be turned on **per-repo** and assumes (establishes) a
 concrete layout: `docs/decisions/` for ADRs, `docs/playbooks/<milestone>.md` for milestone specs,
@@ -11,8 +11,9 @@ never shadows a repo's own tuned `milestone-workflow`.
 
 > **Requires `core`.** A hard dependency, declared in `plugin.json` (`"dependencies": ["core"]`), so
 > enabling `scaffold` auto-enables `core`. The coupling is real: `milestone-workflow` reaches for the
-> `code-reviewer` and `git-workflow` components; `/goal`, `/milestone`, and `skill-maintenance` reach
-> for `doc-sync`; and `/milestone` + `subagent-trail` name `orchestration` — all of which ship in
+> `code-reviewer` and `git-workflow` components and for `doc-sync` (as do `/goal` and `/milestone`);
+> `skill-maintenance` names `doc-sync` only to disclaim it — the in-PR sync rule is discipline rule 6,
+> not that skill's; and `/milestone` + `subagent-trail` name `orchestration` — all of which ship in
 > `core`. These are bare-name **prose** references (no literal `subagent_type` dispatch): they resolve
 > by description and let a repo's own tuned agent of the same name win, so they are intentionally not
 > `core:`-qualified.
@@ -39,9 +40,8 @@ Add the marketplace once, then opt in from the project's `.claude/settings.json`
 
 | Kind    | Name                   | What it does |
 |---------|------------------------|--------------|
-| skill   | `milestone-workflow`   | Load the playbook, work the ordered workstreams, capture forward-looking data, self-verify before claiming a gate, refresh status prose at milestone completion. Driven by `/goal` and `/milestone`. |
-| skill   | `dev-workflow`         | Keep the inner dev/test loop fast and **offline**; standard task taxonomy (`build/test/test-offline/vet/lint/ci/watch`); propose tooling improvements on friction. |
-| skill   | `skill-maintenance`    | When to suggest an existing skill, when to author a new project skill (on the second recurrence of a need), and keeping skills/docs current in-PR. |
+| skill   | `milestone-workflow`   | The milestone **substrate**: playbook + preconditions, forward-looking data capture, the project gate list, the in-PR context rule, and the status-prose sweep at milestone completion. Plan *execution* defers to `superpowers:executing-plans`. Driven by `/goal` and `/milestone`. |
+| skill   | `skill-maintenance`    | The **trigger only**: author a project skill on the second recurrence of a knowledge need, and what belongs in one. How to write/test it is `superpowers:writing-skills`. |
 | command | `/adr`                 | Scaffold the next ADR in `docs/decisions/` from `TEMPLATE.md` (mechanical; author fills the reasoning). |
 | command | `/goal`                | Dispatch a milestone build end-to-end via `milestone-workflow`. |
 | command | `/milestone`           | Generic per-milestone driver (copy into named `/m1`, `/m2`, … as milestones firm up). |
@@ -53,6 +53,17 @@ Add the marketplace once, then opt in from the project's `.claude/settings.json`
 
 Skills/agents/commands auto-discover from their directories; hooks load from `hooks/hooks.json` via
 `${CLAUDE_PLUGIN_ROOT}`, and **merge** with your user/project hooks.
+
+> **Both skills are deliberately partial** — they carry only what `superpowers` doesn't. Plan
+> execution, skill authoring, and the evidence-before-done gate are its job; see the marketplace
+> README's [Relationship to `superpowers`](../README.md#relationship-to-superpowers). The coupling is
+> by discipline: absent `superpowers`, these skills still load, but their deferrals point nowhere.
+>
+> **`dev-workflow` was a skill here until it wasn't.** Its content — `make` targets, a Go toolchain, a
+> tmux layout — is a *project's* task taxonomy, which a plugin cannot assert on the project's behalf.
+> It now lives as a reference example at
+> [`references/project-setup/docs/dev-workflow.md`](references/project-setup/docs/dev-workflow.md),
+> alongside the other substrate you adapt by hand. Same reasoning as the no-generator rule below.
 
 > **`context-nudge` is intentionally not here.** Its substrate — `.claude/state/context-usage.json` —
 > is written by a statusline bridge (`statusline.sh` + the `statusLine` settings key), and a plugin's

@@ -31,6 +31,26 @@ unavailable, the hook plus discipline is the enforcement.
    on the diff. No human approval when solo.
 5. `gh pr merge --rebase --delete-branch`. Squash only for noisy PRs.
 
+## Coexisting with `superpowers:finishing-a-development-branch`
+
+Both skills fire at the same moment — implementation done, time to integrate — and
+they **disagree**. Know which one you're following.
+
+| | `superpowers:finishing-a-development-branch` | this skill |
+|---|---|---|
+| Merge | `git checkout base && git pull && git merge <branch>` — a **merge commit** | `gh pr merge --rebase --delete-branch` — **linear history** |
+| Gate | presents a 4-option menu and **waits for a human** | green-to-merge; no human approval when solo |
+| Scope | local integration + worktree cleanup | PR-into-main, protection, required checks, CI delegation |
+
+**Take from it:** verify tests pass *before* integrating, and its worktree cleanup —
+both are good, and this skill doesn't cover them. **Don't take:** its merge commit
+(breaks linear history) or its base-branch detection (the base is always `main`).
+
+The human-gate difference is a genuine judgment call, not a bug in either. Solo on
+your own repo, green CI is the gate. But when the PR is **self-created and
+self-merged with no independent review**, prefer its ask — "green" proves the code
+compiles, not that anyone looked at it.
+
 ## Pre-implementation branch routing (run before touching any file)
 
 Before writing or editing anything, classify every change by concern and route it

@@ -1,7 +1,7 @@
 {
   "name": "scaffold",
-  "description": "Project-enabled scaffolding layer: milestone/dev/skill-maintenance workflows, the ADR + milestone commands and the /scaffold:milestone-run runner, context-checkpoint & config-guard hooks, a determinism auditor, and references/ for by-hand project setup. Enable per-repo in .claude/settings.json; requires the core plugin and assumes the docs/ + .context/ layout.",
-  "version": "0.2.0",
+  "description": "Project-enabled scaffolding layer: the milestone substrate (playbooks, forward-looking capture, the post-merge status sweep) and the second-recurrence skill-authoring trigger, the ADR + milestone commands and the /scaffold:milestone-run runner, context-checkpoint & config-guard hooks, a determinism auditor, and references/ for by-hand project setup. Complements the superpowers plugin (which owns plan execution and skill authoring) rather than duplicating it. Enable per-repo in .claude/settings.json; requires the core plugin and assumes the docs/ + .context/ layout.",
+  "version": "0.3.0",
   "author": {
     "name": "Mrinal Dhillon"
   },
@@ -13,5 +13,7 @@
     "checkpoint",
     "scaffolding"
   ],
-  "dependencies": ["core"]
+  "dependencies": [
+    "core"
+  ]
 }

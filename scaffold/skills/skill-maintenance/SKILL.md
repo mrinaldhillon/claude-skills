@@ -1,34 +1,39 @@
 ---
 name: skill-maintenance
 description: >-
-  Use to decide when to suggest an existing skill, when to build a new project
-  skill, and how to keep skills and docs current. Trigger when a knowledge need
-  recurs, when starting a task (to suggest skills), or when a discovery extends a doc.
+  Use to decide WHEN a project skill is worth authoring — the second-recurrence
+  trigger — and what belongs in one. Trigger when the same knowledge need (a data
+  shape, an API, a procedure) comes up a second time. Covers the trigger only;
+  superpowers:writing-skills owns how to actually write and test the skill.
 ---
 
-# Skill maintenance and the self-improvement loop (a discipline.md rule)
+# When to author a project skill
 
-## Suggest before starting
-At the start of a task, match it against installed skill descriptions and **state
-which skills apply** and which you'll use. Reach for a skill before re-deriving a
-procedure.
+The trigger, not the craft. **`superpowers:writing-skills` owns the craft** —
+SKILL.md format, frontmatter rules, progressive disclosure, bundled scripts, and
+its RED-GREEN pressure-testing method. The `skill-creator` plugin scaffolds one.
+Don't restate any of that here; go read it.
 
-## Build on recurrence
-When the **same** knowledge need appears a **second** time (a repeated lookup of a
-data shape, an API, a procedure), **author a new project skill** under
-`.claude/skills/<name>/SKILL.md` capturing it. Skill format: a directory with
-`SKILL.md`, YAML frontmatter `name` (lowercase-hyphen, == folder) + `description`
-(a specific activation trigger); Markdown body kept small (progressive disclosure —
-only name+description preload; body and bundled files load on demand); optional
-bundled scripts callable via Bash. Use the `skill-creator` helper if available.
+## Build on the second recurrence
 
-## Maintain in-PR
-When an implementation discovery contradicts or extends a skill, doc, or a
-parse-once knowledge artifact, **update it in the same PR** as the code change,
-citing the discovery as a `file:line` anchor at the current dependency commit. The
-`doc-sync` subagent checks for code-vs-doc drift.
+When the **same** knowledge need appears a **second** time — a repeated lookup of a
+data shape, an external API, a procedure you already re-derived once — stop and
+author a project skill under `.claude/skills/<name>/SKILL.md`.
 
-## What to capture vs not
-Capture stable, reusable knowledge (record framing, external APIs, stream shapes,
-correctness rules). Do not capture one-off task state (that's the playbook/PR) or
-secrets.
+Once is an incident; twice is a pattern with a third occurrence coming. The failure
+this prevents is re-deriving the same procedure every session and paying full
+context for it each time. Authoring on the *first* occurrence is the opposite
+failure — speculative skills that never fire.
+
+## What belongs in one
+
+Capture **stable, reusable** knowledge: record framing, external API shapes, stream
+formats, correctness rules. Do **not** capture one-off task state (that is the
+playbook or the PR body) or secrets of any kind.
+
+## Not covered here, on purpose
+
+- **How to write/test it** → `superpowers:writing-skills`.
+- **Announcing which skills apply at task start** → `superpowers:using-superpowers`.
+- **Updating a skill/doc in the same PR as the code that contradicted it** → that is
+  discipline rule 6, enforced by the `doc-sync` agent — not a rule of this skill.

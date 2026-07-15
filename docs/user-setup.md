@@ -43,6 +43,13 @@ predates the `core`/`scaffold` plugin split, so its "seeded into each project" l
 today those skills/agents ship via the `core` and `scaffold` plugins rather than being copied
 per-project — but the guidance itself still holds. Paste it as-is:
 
+> **Two further drifts in the quoted list, left unedited to keep the block verbatim.** It names
+> `dev-workflow`, which is no longer a skill — it is a reference example at
+> `scaffold/references/project-setup/docs/dev-workflow.md` (a project's `make`/Go/tmux taxonomy is
+> substrate, not portable steering). And `skill-maintenance` is now the second-recurrence *trigger*
+> only; authoring mechanics belong to `superpowers:writing-skills`. See the marketplace README's
+> [Relationship to `superpowers`](../README.md#relationship-to-superpowers).
+
 > # Claude Code operating discipline
 >
 > How to run Claude Code itself. The voice is the `distinguished-engineer` output style; the
