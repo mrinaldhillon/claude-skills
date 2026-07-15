@@ -9,7 +9,7 @@ keeping a personal steering layer in sync (per code.claude.com/docs: plugins, pl
 | Plugin | Scope | Contents |
 |--------|-------|----------|
 | [`core`](./core) | user-level (all repos) | 4 skills (`cost-aware-delegation`, `orchestration`, `git-workflow`, `deep-research-tiered`), 5 agents (`advisor-plus`, `code-reviewer`, `search`, `doc-sync`, `config-auditor`), the `distinguished-engineer` output style, 2 guard hooks (`block-main-writes`, `guard-secrets`) |
-| [`scaffold`](./scaffold) | per-repo (opt-in) | 3 skills (`milestone-workflow`, `dev-workflow`, `skill-maintenance`), 4 commands (`/adr`, `/goal`, `/milestone`, `/scaffold:milestone-run`), the `determinism-auditor` agent, 3 hooks (`checkpoint`, `subagent-trail`, `validate-config`), and `references/` for by-hand project setup. **Requires `core`.** |
+| [`scaffold`](./scaffold) | per-repo (opt-in) | 2 skills (`milestone-workflow`, `skill-maintenance`), 4 commands (`/adr`, `/goal`, `/milestone`, `/scaffold:milestone-run`), the `determinism-auditor` agent, 3 hooks (`checkpoint`, `subagent-trail`, `validate-config`), and `references/` for by-hand project setup. **Requires `core`.** |
 
 `core` is broadly/globally enabled and project-agnostic. `scaffold` is the project-enabled half: turn it on
 per-repo, and it assumes a concrete `docs/` + `.context/` layout (hand-set up per
@@ -24,6 +24,50 @@ plugins are added as new entries in `.claude-plugin/marketplace.json`.
 - **Does not belong:** repo-specific skills saturated with one project's policy (they live in that repo's
   `.claude/skills/`), and Apple's bundled Xcode skills (`swiftui-specialist`, etc.) that are re-exported per
   Xcode update and would go stale if committed — keep those at user level.
+- **Does not belong: anything `superpowers` already does better** — see below.
+
+## Relationship to `superpowers`
+
+[`superpowers@claude-plugins-official`](https://github.com/obra/superpowers) is assumed present and is
+the **process layer**: brainstorming → writing-plans → executing-plans / subagent-driven-development →
+TDD → systematic-debugging → verification-before-completion → writing-skills. This marketplace does
+**not** re-implement any of it. The division:
+
+| Concern | Owner |
+|---|---|
+| How to write, test, and structure a skill | `superpowers:writing-skills` (+ `skill-creator`) |
+| Executing a written plan task-by-task; dispatching per-task subagents | `superpowers:executing-plans` / `subagent-driven-development` |
+| How to *word* a subagent dispatch (pack context, scope, output format) | `superpowers:dispatching-parallel-agents` |
+| Evidence before claiming done | `superpowers:verification-before-completion` |
+| **Which model runs it, and what it costs** — concrete Haiku/Sonnet/strong routing, `opts.model` per Workflow stage, the `budget` guard, checkpoint-before-loss | **`core`** — see the note below; superpowers tiers by *role* but never names models or Workflow primitives |
+| **Trunk-based git policy** — the *PR* merge method (rebase vs squash), branch routing, protection, required checks, CI delegation | **`core:git-workflow`** — superpowers defines only a *local* `git merge` in `finishing-a-development-branch`, and never a GitHub PR merge method |
+| Milestone substrate (`docs/playbooks/`, `.context/`, the post-merge status sweep) | **`scaffold:milestone-workflow`** |
+| Agents, commands, output style, guard hooks | **`core`/`scaffold`** — superpowers ships none of these |
+
+> **Credit where due — the tiering overlap is real, and `core` is not the only one who thought of it.**
+> `superpowers:subagent-driven-development` has a full *Model Selection* section that independently
+> reaches the same conclusion: *"Use the least powerful model that can handle each role"* and
+> *"Always specify the model explicitly when dispatching a subagent. An omitted model inherits your
+> session's model — often the most capable and most expensive."* That is `cost-aware-delegation`'s
+> thesis, arrived at separately. Two things keep `core`'s version: SDD's guidance fires only *inside*
+> subagent-driven-development, whereas `cost-aware-delegation` is the always-on routing policy; and
+> SDD is deliberately model-agnostic where `core` is Claude-Code-concrete (named tiers, `opts.model`,
+> the `budget` object, the git-ops→Sonnet rule). The traffic runs both ways: SDD's *turn count beats
+> token price* insight was **missing** from `cost-aware-delegation` and has been adopted into it.
+
+**This coupling is by discipline, not declared.** Cross-marketplace dependencies *are* expressible
+(`{"name": "superpowers", "marketplace": "claude-plugins-official"}` plus
+`allowCrossMarketplaceDependenciesOn` in `marketplace.json`), but they are **hard** — there is no
+documented optional/soft dependency, and a missing dep makes *enable fail*. Making `core` — whose whole
+premise is portability — hard-fail without a third-party plugin is a worse trade than a documented
+assumption. So the deferrals above are prose pointers: if `superpowers` is absent, you lose the
+pointed-to guidance but `core` still loads. Same reasoning as
+[ADR 0002](scaffold/references/project-setup/decisions/0002-branch-protection-by-discipline.md):
+don't assert enforcement the repo doesn't have.
+
+> One live conflict, documented rather than resolved: `superpowers:finishing-a-development-branch`
+> merges with a **merge commit** behind a mandatory human menu; `core:git-workflow` **rebase-merges**
+> with no human gate when solo. See that skill's *Coexisting with* section.
 
 ## Install
 

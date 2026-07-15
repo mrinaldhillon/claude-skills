@@ -28,6 +28,7 @@ The repo root also carries **`CLAUDE.md`** (instructions for Claude Code) and
 | `discipline.md` | The numbered rules — the non-negotiable constraints |
 | `architecture.md` | Components, processes, layout, import/layering boundaries |
 | `vocabulary.md` | Terms that are easy to misread, with the misunderstanding each prevents |
+| `dev-workflow.md` | Example inner-loop taxonomy (offline-first tests, `make`-style targets, friction→tooling). Adapt into the project's CLAUDE.md Commands table; the `make`/Go/tmux specifics are one project's answer, not a requirement |
 | `decisions/` | Append-only ADRs (one decision per file; never edited, only superseded) |
 
 Agent-written project state — `project-context.md` (current milestone, active
