@@ -3,7 +3,9 @@ name: doc-sync
 description: >-
   Check that code matches the specs/docs/architecture and that discoveries were
   written back in the same PR. Flags drift and proposes the doc/skill/ADR edits
-  to fix it. Use on each PR after review.
+  to fix it. Use only on PRs whose diff touches a docs surface (specs, design
+  docs, skills, ADRs, CI workflow) or at a milestone close — it is the heaviest
+  per-call agent; no docs surface, no invocation.
 tools: Read, Grep, Glob, Edit, Write
 model: claude-sonnet-5
 ---

@@ -2,7 +2,9 @@
 # Offline test for checkpoint.sh in a throwaway repo: refuses to commit on
 # main, commits on a feature branch, no-ops when clean, leaves unrelated
 # staged files alone, and still commits existing paths when another
-# checkpointed path is absent from the filesystem entirely.
+# checkpointed path is absent from the filesystem entirely. Also: reports an
+# honest busy-skip when index.lock is held for the whole run, and retries
+# through a transient lock to commit.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$here/.." && pwd)"
@@ -61,6 +63,42 @@ out="$(CLAUDE_PROJECT_DIR="$tmp" bash "$script")"
 expect "$out" "committed durable state"
 [ "$(git rev-list --count HEAD)" = $((before + 1)) ] || { echo "FAIL: absent .context voided the docs/decisions commit"; fail=1; }
 git show --name-only --format= HEAD | grep -qx "docs/decisions/999-test.md" || { echo "FAIL: ADR not in checkpoint commit"; fail=1; }
+
+# 6. index.lock held for the whole run: must NOT lie "no changes" — reports
+# the busy skip (stderr) and exits 0. Parallel subagents make this expected.
+mkdir -p .context
+echo change3 > .context/RESUME.md
+touch .git/index.lock
+before="$(git rev-list --count HEAD)"
+rc=0
+out="$(CLAUDE_PROJECT_DIR="$tmp" bash "$script" 2>&1)" || rc=$?
+rm -f .git/index.lock
+[ "$rc" -eq 0 ] || { echo "FAIL: non-zero exit under held lock"; fail=1; }
+expect "$out" "index busy"
+[ "$(git rev-list --count HEAD)" = "$before" ] || { echo "FAIL: commit under held lock"; fail=1; }
+
+# 7. Transient lock (freed after ~0.5s): the retry loop must win and commit.
+echo change4 > .context/RESUME.md
+touch .git/index.lock
+( sleep 0.5; rm -f .git/index.lock ) &
+locker=$!
+before="$(git rev-list --count HEAD)"
+rc=0
+out="$(CLAUDE_PROJECT_DIR="$tmp" bash "$script" 2>&1)" || rc=$?
+wait "$locker"
+[ "$rc" -eq 0 ] || { echo "FAIL: non-zero exit on transient lock"; fail=1; }
+expect "$out" "committed durable state"
+[ "$(git rev-list --count HEAD)" = $((before + 1)) ] || { echo "FAIL: no commit after transient lock"; fail=1; }
+
+# 8. Non-lock hard failure (unwritable object store): must surface "add failed"
+# with git's real error on stderr — not report "no changes" — and still exit 0.
+echo change5 > .context/RESUME.md
+chmod -R a-w .git/objects
+rc=0
+out="$(CLAUDE_PROJECT_DIR="$tmp" bash "$script" 2>&1)" || rc=$?
+chmod -R u+w .git/objects
+[ "$rc" -eq 0 ] || { echo "FAIL: non-zero exit on hard add failure"; fail=1; }
+expect "$out" "add failed"
 
 if [ "$fail" -eq 0 ]; then echo "ALL PASS"; fi
 exit "$fail"

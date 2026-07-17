@@ -23,7 +23,9 @@ accumulate merge debt and drift; the value is in a single always-green trunk.
   `.claude/**`, CI config, the build file) go on their own `chore/…` branch — never
   mixed into a milestone branch. See the `git-workflow` skill § branch routing.
 - **Green-to-merge**: CI green + the project's correctness gate passes + the
-  `code-reviewer` and `doc-sync` agents have run on the diff.
+  `code-reviewer` agent has run once on the full branch diff (`doc-sync` too
+  where the diff touches a docs surface, or at milestone close — see each
+  agent's description for its scope).
 - **Rebase-and-merge** by default (linear history; squash only noisy PRs); delete the
   branch on merge. Never force-push `main`.
 - `main` is **branch-protected**: require a PR + passing CI + linear history + no

@@ -65,6 +65,15 @@ after Verify, before Synthesize.** `SubagentStop` does **not** fire for
 Workflow-internal agents, so this cannot be a hook — it is a step in the script (or the
 orchestrator's job). Checkpoint per landed unit, not at the end.
 
+**The orchestrator does the Write — never trust worker Writes as the checkpoint
+mechanism.** Worker file-Writes are best-effort: in a real 18-agent fleet told to Write
+checkpoints to an absolute path, 6 wrote to their CWD (polluting the repo) and 12 wrote
+nowhere. Carry the payload in each stage's **structured return** (`schema`) and have the
+orchestrator persist the returned object. If a run dies anyway, every agent's actual
+return survives in the run journal — `journal.jsonl` in the workflow run's transcript
+dir (`subagents/workflows/wf_*/` under the session's project dir) — recover with
+`jq 'select(.type=="result") | .result'` instead of re-running the fleet.
+
 ### 4. Synthesis must run even if partial
 If the budget is nearly spent or verification is incomplete, **still synthesize what
 exists** and label it partial. A partial cited report beats a dead run with the
@@ -98,6 +107,13 @@ never enters the picture.
 - **Re-verify the load-bearing abstentions** with a small, targeted second pass (the
   "Track A" pattern: a few Sonnet graders on just the high-signal unverified claims)
   rather than re-running the whole fan-out.
+- **Tool-existence claims need execution, not search.** A web fleet can validate a
+  *name* and still miss that the command doesn't exist (a real fleet confirmed a
+  skill's name while the `xcrun` subcommand it hung on didn't exist at all — only
+  running the binary caught it). For claims about installed tools, CLIs, or local
+  APIs, give at least one verifier Bash and have it run the thing (`--version`,
+  `--help`). And read the votes: discard degenerate verdicts (a one-word rationale
+  like "test"); no single uncorroborated vote is load-bearing.
 
 ## Reference workflow snippet (the per-stage pins made concrete)
 A schematic of the corrected harness — pins on every stage, a budget guard, a
@@ -106,7 +122,8 @@ checkpoint before synthesis, and a synthesis that always runs:
 This is a **Workflow-tool script**: `export const meta` + top-level `await`/`return` is
 the shape the tool runs (it wraps the body in an async context). `agent`, `parallel`,
 `log`, `args`, `budget`, and `opts.{model,phase,schema}` are Workflow primitives;
-`ANGLES`/`CLAIMS`/`VERDICT`/`REPORT` are your JSON schemas. Schematic — adapt before use.
+`ANGLES`/`CLAIMS`/`VERDICT`/`CHECKPOINT`/`REPORT` are your JSON schemas. Schematic —
+adapt before use.
 
 ```js
 export const meta = {
@@ -149,10 +166,18 @@ for (const c of claims) {
 }
 
 // 4. CHECKPOINT — REQUIRED, before synthesis: the step whose absence lost the last run.
-//    A Workflow script has no filesystem access, so persist via a Write-capable agent
-//    (or have the orchestrator Write the returned `graded` after the run).
-await agent(`Persist this payload verbatim to a memory checkpoint file: ${JSON.stringify({ graded })}`,
-  { phase: 'Verify', model: 'haiku' })
+//    A Workflow script has no filesystem access, and worker Writes are BEST-EFFORT
+//    (real fleet: 6/18 wrote to their CWD, 12 wrote nowhere) — so prefer splitting the
+//    run: this workflow RETURNS `graded`, the orchestrator Writes the checkpoint, and
+//    synthesis runs as a second call taking it as args. Checkpointing in-run (below):
+//    the persist agent must READ THE FILE BACK and return {path, bytes}; treat a
+//    missing readback as unpersisted. Either way the run journal (journal.jsonl in
+//    the run's transcript dir, subagents/workflows/wf_*/) holds every return.
+const ck = await agent(
+  `Write this payload verbatim to <absolute checkpoint path>, then read the file
+   back and return {path, bytes: <byte count read back>}: ${JSON.stringify({ graded })}`,
+  { phase: 'Verify', model: 'haiku', schema: CHECKPOINT })
+if (!ck?.bytes) log('checkpoint unverified — recovery will need the run journal')
 
 // 5. Synthesize — Opus, single writer; runs even when `graded` is partial.
 return await agent(
@@ -174,3 +199,7 @@ are provenance pointers, and the load-bearing figures are already inlined above.
   loss* (a per-project skill seeded from the template).
 - The ~15× premium, context-rot, single-writer, and independent-critic claims:
   `docs/meta/orchestration-research.md` §§1–3, 5 (each with its primary source).
+- The worker-Write failure counts (6/18 to CWD, 12/18 nowhere) and the
+  `journal.jsonl` recovery recipe: the 2026-07-13 handled-next audit fleets
+  (that repo's memory: `multi-agent-audit-lessons`); journal path and schema
+  re-verified on disk 2026-07-16.

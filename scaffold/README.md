@@ -47,7 +47,7 @@ Add the marketplace once, then opt in from the project's `.claude/settings.json`
 | command | `/milestone`           | Generic per-milestone driver (copy into named `/m1`, `/m2`, … as milestones firm up). |
 | command | `/scaffold:milestone-run` | Prints the exact terminal command to run the milestone loop (resolves the plugin path); the runner itself (`scripts/milestone-runner.sh`) spawns fresh `claude -p` sessions, so it must run from a plain terminal, not nested in this session. |
 | agent   | `determinism-auditor`  | Advisory pre-scan for the five determinism/hot-path footguns; genericized (no `<PLACEHOLDER>`). Relevant only to projects with a replay/append-only invariant. Sonnet; terminal. |
-| hook    | `checkpoint`           | Stop + PreCompact: commit durable state (`.context/`, `docs/decisions/`) on non-`main` branches. No-ops when the substrate is absent; activates once you create `.context/` (see `references/project-setup/`). |
+| hook    | `checkpoint`           | Stop + PreCompact: commit durable state (`.context/`, `docs/decisions/`) on non-`main` branches. No-ops when the substrate is absent; activates once you create `.context/` (see `references/project-setup/`). Retries under index.lock contention from parallel subagents, then skips calmly (best-effort; the next Stop retries). |
 | hook    | `subagent-trail`       | SubagentStop: append-only breadcrumb index of Agent-tool subagent transcripts for post-compaction recovery. |
 | hook    | `validate-config`      | PostToolUse(Write\|Edit): validate `.claude/` JSON + frontmatter on edit. |
 
