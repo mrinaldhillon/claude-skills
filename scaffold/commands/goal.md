@@ -1,7 +1,7 @@
 ---
 description: Dispatch a milestone build end-to-end (drives /milestone via the milestone-workflow skill)
 argument-hint: <milestone-name> [notes]
-model: claude-opus-4-8
+model: fable
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent, Skill, AskUserQuestion, TaskCreate, TaskUpdate, TaskList, TaskGet
 ---
 

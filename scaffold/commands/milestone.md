@@ -1,7 +1,7 @@
 ---
 description: Generic per-milestone driver (copy into named /m1, /m2, … as milestones firm up)
 argument-hint: <milestone-name> [notes]
-model: claude-opus-4-8
+model: fable
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent, Skill, AskUserQuestion, TaskCreate, TaskUpdate, TaskList, TaskGet
 ---
 
