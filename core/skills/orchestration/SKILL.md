@@ -69,7 +69,12 @@ across 108 agents and produced no report). Rules:
 - **Checkpoint distilled output to a durable file as an explicit step, not a
   hook.** `SubagentStop` does not fire for Workflow-internal agents, and even for
   Agent-tool subagents the payload carries no result text. Checkpoint per landed
-  unit, not all at the end; synthesize even if partial.
+  unit, not all at the end; synthesize even if partial. The **orchestrator** does
+  the Write — worker file-Writes are best-effort (a real 18-agent fleet: 6 wrote
+  to their CWD, 12 wrote nowhere; the payloads survived only in the run journal).
+  Carry results in structured returns and treat the run journal as the recovery
+  record (`journal.jsonl` in the workflow run's transcript dir —
+  `subagents/workflows/wf_*/` under the session's project dir).
 - **Journal the fan-out plan before a large launch, not just its output.** Before
   an Agent-tool fan-out past the concurrency width or any multi-wave run, write the
   task list, per-agent assignment, and per-unit done/not-done state to a durable
@@ -79,8 +84,9 @@ across 108 agents and produced no report). Rules:
 
 ## Who consults whom — workers vs critics
 
-The **main loop may call `advisor`**. Subagents fall into two classes, and neither
-calls `advisor`:
+The **main loop may call `advisor`** (on Fable sessions: the `advisor-plus`
+agent — the built-in tool is unsupported there; `cost-aware-delegation` › Verify
+with the advisor). Subagents fall into two classes, and neither calls `advisor`:
 
 - **Workers** (fan-out implementers): on a genuine design fork they `SendMessage`
   `main` — never `advisor`. Each consult must carry enough context (the decision,
@@ -101,7 +107,7 @@ test suite, a determinism/reproducibility check (same input → byte-equal outpu
 linters run in strict mode, formatters run as a check, type-checkers, and any
 schema/contract/catalog validator. Gates outrank every LLM judge; an auditor that
 **independently re-derives** a golden from raw inputs substantiates "hand-computed".
-Main backstops its own design with `advisor`.
+Main backstops its own design with the advisor (`advisor-plus` on Fable).
 
 ## Verification economics — size the verify fleet to the stakes
 
@@ -115,6 +121,13 @@ Main backstops its own design with `advisor`.
 - **Surface fleet size before big launches** — state the agent count and a rough
   token estimate before a large verification pass; a silent 500k-token fleet is an
   unreviewed spend decision.
+- **Scope each critic to the surface it audits** — the docs critic runs only when
+  the diff touches a docs surface, the config auditor only on steering-layer
+  (`.claude/`) diffs; the heaviest per-call agent gets the tightest gate. Critics
+  run **once per PR on the full branch diff** — after all the PR's tasks, before
+  the PR opens — never per commit and never as an iterative re-review loop:
+  fragmentary diffs produce fragmentary findings, and loops burn tokens
+  re-adjudicating settled points.
 
 ## Parallelism, isolation, and merge discipline
 
@@ -160,6 +173,15 @@ string, and only the child's final message returns (see Grounding).
 
 - **Worktree isolation can switch the MAIN checkout** onto a subagent branch —
   always `git branch --show-current` before merging or cherry-picking.
+- **Never switch branches in the shared tree while a read-agent is running** —
+  its later re-reads silently return the *new* branch's content. Hold branch
+  switches until spawned readers return; `isolation: worktree` helps only when
+  the reader targets default-branch state (a worktree branches from the default
+  branch, not your HEAD — see above).
+- **Before calling a subagent wrong about repo state, check whether HEAD moved.**
+  A finding produced pre-commit can be honestly stale rather than hallucinated —
+  `git log` for commits newer than the phase that produced the claim, and
+  reconcile each phase against the HEAD it ran at.
 - **Run the full gate list before the PR**, not just the fast test subset — the
   format *check* and strict lint catch what a dev-loop test run never flags; it's
   the discriminator between a green PR and a red round-trip.
@@ -180,6 +202,11 @@ string, and only the child's final message returns (see Grounding).
   parent→child channel is the prompt string. (code.claude.com/docs/en/sub-agents)
 - **Model tiering is first-class & per-subagent** (`model` frontmatter).
   (code.claude.com/docs/en/sub-agents)
+- **Worker file-Writes are best-effort; the run journal is the record** — a
+  2026-07-13 18-agent fleet: 6 checkpoint Writes landed in the wrong dir, 12
+  nowhere; every payload was recovered from the run's `journal.jsonl`
+  (handled-next memory `multi-agent-audit-lessons`; path/schema re-verified on
+  disk 2026-07-16).
 - **Verification uses independent critics**, not orchestrator-as-judge.
   (anthropic.com/research/building-effective-agents — Writer/Reviewer)
 - **Single-thread coupled writes.** (cognition.com/blog/dont-build-multi-agents)

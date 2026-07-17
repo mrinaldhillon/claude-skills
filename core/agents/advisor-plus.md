@@ -8,7 +8,9 @@ description: >-
   sessions; this agent picks per consult). INVOCATION RULE — the caller
   selects the model one tier above the session model via the Agent tool's
   `model` param: haiku→sonnet, sonnet→opus, opus→fable; if the session already
-  runs Fable (the top tier), omit the override — `inherit` yields Fable.
+  runs Fable (the top tier), omit the override — `inherit` yields Fable. On
+  Fable sessions the built-in `advisor` tool is unsupported (as of 2026-07), so
+  this agent is the only advisor path there.
   Advisory only: it judges and recommends, never edits. Pack the full decision
   context into the prompt — the question, options considered, constraints, and
   pointers to the relevant files.

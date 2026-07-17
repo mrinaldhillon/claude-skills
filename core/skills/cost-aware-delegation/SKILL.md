@@ -109,6 +109,12 @@ reviews. Set `advisorModel` to **at least the main-loop model** (Opus or stronge
 weaker advisor can't reliably catch a strong model's mistakes. After nontrivial
 main-loop work, verify with the advisor before claiming done. **Evidence before assertions.**
 
+**On a Fable session the built-in advisor tool does not work** — the `advisorModel`
+path is unsupported at the top tier (observed 2026-07-16; re-check on harness
+updates). Route every consult through the `advisor-plus` agent instead, with **no
+`model` override**: `inherit` already yields Fable, and there is no tier above to
+select.
+
 **Cheap subagents don't need their own advisor.** The main loop already reads and
 verifies every subagent's output (build, tests, read), so a separate advisor pass on
 subagent work is redundant. The flow is: delegate → main loop verifies. Reserve the

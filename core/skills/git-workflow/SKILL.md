@@ -24,11 +24,13 @@ unavailable, the hook plus discipline is the enforcement.
    `git switch -c <b> origin/main && git push -u origin <b>`.
 2. Work in focused checkpoints; keep iterating with the repo's fast host-side loop
    (build + unit tests) once code exists.
-3. PR into `main`: `gh pr create --base main` with the PR template checklist
-   filled honestly.
+3. All the PR's tasks done? Run the independent reviewer/auditor agents **once
+   on the full branch diff** — never per commit, each scoped to the surface it
+   audits (`orchestration` › Verification economics) — then PR into `main`:
+   `gh pr create --base main` with the PR template checklist filled honestly.
 4. **Green-to-merge** (the gate): CI green (the deliberate subset, in lockstep
-   with the repo's documented commands); independent reviewer/auditor agents run
-   on the diff. No human approval when solo.
+   with the repo's documented commands); the step-3 review findings addressed.
+   No human approval when solo.
 5. `gh pr merge --rebase --delete-branch`. Squash only for noisy PRs.
 
 ## Coexisting with `superpowers:finishing-a-development-branch`
