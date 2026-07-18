@@ -39,6 +39,8 @@ jobs:
         run: ./scripts/test-guard-secrets.sh
       - name: test checkpoint hook
         run: ./scripts/test-checkpoint.sh
+      - name: test resume-inject hook
+        run: ./scripts/test-resume-inject.sh
       - name: test subagent-trail hook
         run: ./scripts/test-subagent-trail.sh
       - name: test validate-config hook

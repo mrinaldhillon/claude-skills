@@ -44,6 +44,17 @@
         ]
       }
     ],
+    "SessionStart": [
+      {
+        "matcher": "compact|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/resume-inject.sh\""
+          }
+        ]
+      }
+    ],
     "SubagentStop": [
       {
         "matcher": "*",
