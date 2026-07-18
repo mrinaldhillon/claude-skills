@@ -32,10 +32,6 @@
     ],
     "SessionStart": [
       {
-        "matcher": "compact",
-        "hooks": [ { "type": "command", "command": "cat \"${CLAUDE_PROJECT_DIR:-$PWD}/.context/RESUME.md\" 2>/dev/null || true" } ]
-      },
-      {
         "matcher": "startup|resume",
         "hooks": [ { "type": "command", "command": "true  # <PLACEHOLDER bootstrap>: environment detection — e.g. test -S /run/<service>.sock && echo 'ENV: PRODUCTION host' || echo 'ENV: dev host'." } ]
       }
