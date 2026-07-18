@@ -88,6 +88,49 @@ across 108 agents and produced no report). Rules:
   re-running the whole fan-out. This persists the *plan* of the fan-out; the bullet
   above persists its *output*.
 
+## Context hygiene — checkpoint, clear, resume (don't let autocompact decide)
+
+A long orchestration session accretes context that is re-sent on every API call. The
+cost that bites is **not dollars** — re-sent history is cache-read, the cheap tier — but
+**context rot** (reasoning degrades as the window fills; see Grounding), **window
+pressure** (nearing the limit forces a compaction), and **latency** (a bigger window is
+a slower call). Spend the *right* context per prompt; don't let it grow unbounded because
+it "still fits."
+
+When the window fills, Claude Code **auto-compacts**: it replaces history with a
+generated summary, on its own schedule, lossily. Don't let that be your
+context-management strategy. The discipline is to **checkpoint durable state to files,
+`/clear`, and resume from those files** at a boundary *you* choose (a gate or milestone
+close) — so the resume reads from your curated substrate, not an auto-summary you never
+reviewed. This is the session-level twin of *checkpoint before loss* above: that rule
+saves a worker's output; this one saves the orchestrator's own working context.
+
+Three delivery tiers, by session mode:
+
+- **Proactive nudge (interactive).** A threshold nudge — watch at ~55%, land by ~65% —
+  that tells the model to write the resume file and stop for a clean `/clear`. It needs a
+  **status-line → file → hook bridge**: no hook event receives context-window usage on
+  its stdin, so the status line (the only surface that sees usage) must persist it to a
+  state file for a hook to read and act on. Opt-in per-repo machinery, not a core
+  primitive.
+- **Reactive backstop.** Two hooks bracket a compaction you couldn't prevent:
+  `PreCompact` commits durable state before the summary lands (it can't steer the summary
+  or run `/clear` — verified), and a `SessionStart(compact|clear)` hook re-injects that
+  saved resume file into the fresh window afterward. Together they make an unplanned
+  autocompact — or a deliberate `/clear` — resume from your curated substrate, not just
+  the auto-summary. Bridge-free (needs no context-window data), unlike the proactive
+  nudge.
+- **Fresh-session milestone runner (long / unattended).** Run each milestone phase as a
+  fresh `claude -p` session so context never accretes across phases; cap per-phase
+  compaction with `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`.
+
+Keep the **principle** here; bind the **machinery** in a project. The concrete thresholds,
+the state-file path, the resume-file layout, the nudge hook, and the runner are a repo's
+opt-in `.context/` substrate (e.g. the `scaffold` plugin's milestone substrate) — `core`
+can't ship them because they need a project's own `statusLine` and `settings.json`. Same
+split as *Extending this skill*: principle and guards here, concrete bindings in the
+companion/substrate.
+
 ## Who consults whom — workers vs critics
 
 The **main loop may call `advisor`** (on Fable sessions: the `advisor-plus`
@@ -236,5 +279,11 @@ ambiguously and drifts behind core (there is no skill inheritance).
 - **Workflow-tool mechanics are documented tool parameters** — `opts.model` per
   stage, the `budget` object, `isolation: 'worktree'`. (Claude Code Workflow tool
   interface.)
+- **No hook event receives context-window usage on stdin** (verified v2.1.212) — the
+  status line is the only surface carrying context-usage data, so a proactive threshold
+  nudge must bridge status-line → state file → hook. `PreCompact` stdin carries only
+  `trigger` + `custom_instructions` and cannot steer the compaction summary; the
+  documented re-inject-after-compaction channel is a `SessionStart(compact)` hook.
+  (code.claude.com/docs/en/hooks)
 
 Re-validate with a `claude-code-guide` lookup if the docs evolve.
