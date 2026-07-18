@@ -18,12 +18,16 @@ set -euo pipefail
 cd "${CLAUDE_PROJECT_DIR:-.}"
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
-# ADR directory defaults to docs/decisions; a project with a different layout
-# overrides it via CLAUDE_ADR_DIR (set in .claude/settings.json > env).
+# ADR directory defaults to docs/decisions; the project-context doc defaults to
+# .context/project-context.md. A project with a different layout overrides either
+# via CLAUDE_ADR_DIR / CLAUDE_PROJECT_CONTEXT (set in .claude/settings.json > env)
+# — e.g. a repo that treats project-context.md as curated docs, not scratch state,
+# and keeps it under docs/ while .context/ holds only agent-written session state.
 adr_dir="${CLAUDE_ADR_DIR:-docs/decisions}"
-paths=(.context/project-context.md "$adr_dir" .context/RESUME.md)
+pc="${CLAUDE_PROJECT_CONTEXT:-.context/project-context.md}"
+paths=("$pc" "$adr_dir" .context/RESUME.md)
 
-for f in .context/project-context.md .context/RESUME.md; do
+for f in "$pc" .context/RESUME.md; do
   [ -f "$f" ] || echo "checkpoint: WARNING missing $f — did Claude write it?" >&2
 done
 

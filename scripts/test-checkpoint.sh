@@ -108,5 +108,14 @@ out="$(CLAUDE_PROJECT_DIR="$tmp" CLAUDE_ADR_DIR="handled-docs/05-decisions" bash
 expect "$out" "committed durable state"
 git show --name-only --format= HEAD | grep -qx "handled-docs/05-decisions/001-x.md" || { echo "FAIL: CLAUDE_ADR_DIR override not checkpointed"; fail=1; }
 
+# 10. CLAUDE_PROJECT_CONTEXT override: a project that keeps project-context.md as
+# curated docs (not scratch state) gets docs/project-context.md checkpointed
+# instead of the .context/project-context.md default.
+mkdir -p docs
+echo "# curated context" > docs/project-context.md
+out="$(CLAUDE_PROJECT_DIR="$tmp" CLAUDE_PROJECT_CONTEXT="docs/project-context.md" bash "$script" 2>&1)" || true
+expect "$out" "committed durable state"
+git show --name-only --format= HEAD | grep -qx "docs/project-context.md" || { echo "FAIL: CLAUDE_PROJECT_CONTEXT override not checkpointed"; fail=1; }
+
 if [ "$fail" -eq 0 ]; then echo "ALL PASS"; fi
 exit "$fail"
