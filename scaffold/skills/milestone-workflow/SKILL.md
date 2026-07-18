@@ -62,3 +62,21 @@ parallel via subagents, tiered per `orchestration`.
 
 6. **Ask only at documented decision points** (e.g. key/credential setup, first live
    capture, first real-money action). Otherwise proceed.
+
+## Context hygiene at gate boundaries
+
+A milestone build is long, so its session accretes context. Keep per-call context
+small — see `orchestration` › *Context hygiene* for the model (the cost that bites is
+context rot + window pressure + latency, not dollars; re-sent history is cache-read).
+
+- **Clear at each gate boundary** (or when the ~65% `context-nudge.sh` nudge fires):
+  write `.context/RESUME.md` (single next action + branch + gate status), then `/clear`.
+  The `resume-inject.sh` hook (`SessionStart(compact|clear)`) re-injects `RESUME.md`
+  afterward, so a cleared or autocompacted session resumes lean from files, not an
+  accreted transcript. (`context-nudge.sh` only injects the guidance — a hook cannot
+  run `/clear`; you do.)
+- **For a long or headless build, drive it via `milestone-runner.sh`**
+  (`/scaffold:milestone-run`) — it runs the milestone as a sequence of fresh `claude -p`
+  sessions, each bounded automatically (per-iteration budget cap, an `AUTOCOMPACT_PCT`
+  compaction cap, `PHASE_TIMEOUT`, and a deterministic iteration gate), so context never
+  accretes across phases.
