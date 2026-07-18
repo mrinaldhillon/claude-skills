@@ -1,7 +1,7 @@
 {
   "name": "core",
   "description": "Cross-repo personal Claude Code layer: skills (cost-aware delegation with a Sonnet subagent floor, tiered orchestrator-worker fan-out, trunk-based git workflow, tiered deep research), review/search/doc agents, the distinguished-engineer output style, and a universal secret-guard hook (the trunk-write guard moved to the project-scoped scaffold plugin). Owns model tiering and git-workflow policy; defers prompt craft, plan execution and skill authoring to the superpowers plugin.",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "author": {
     "name": "Mrinal Dhillon"
   },
