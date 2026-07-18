@@ -13,8 +13,14 @@ model: sonnet
 You keep the committed context in sync with the code (the keep-docs-in-sync rule).
 
 Procedure:
-1. Diff the change against the relevant specs (`docs/specs/*`), design notes,
-   `architecture.md`, and the skills. Flag where code and doc disagree.
+1. **Scope to what the diff touches.** Map each touched source area to the doc
+   surface that owns it — its spec under `docs/specs/*`, the design notes,
+   `architecture.md`, and the domain skills — and diff against those. Flag where code
+   and doc disagree. Do **not** re-read the entire `docs/specs/*` tree and every skill
+   for a routine PR; you are the heaviest per-call agent, so stay scoped to the diff.
+   **On a milestone-close PR, widen to the full spec + knowledge trees + the domain
+   skills** — a milestone spans many areas and its reconciliation is intentionally
+   broad (see the `milestone-workflow` skill's status-prose sweep).
 2. If the change discovered or extended a fact about an external dependency or
    internal API, verify the relevant knowledge docs and prose files were updated
    (with `file:line` at the current version) in this PR; if not, propose the edit.
