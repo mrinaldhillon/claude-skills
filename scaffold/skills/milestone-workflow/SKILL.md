@@ -70,7 +70,9 @@ small — see `orchestration` › *Context hygiene* for the model (the cost that
 context rot + window pressure + latency, not dollars; re-sent history is cache-read).
 
 - **Clear at each gate boundary** (or when the ~65% `context-nudge.sh` nudge fires):
-  write `.context/RESUME.md` (single next action + branch + gate status), then `/clear`.
+  write `.context/RESUME.md` (single next action + branch + gate status), commit the
+  durable files on the branch (`/clear` fires no `PreCompact`, so no hook commits them
+  for you — ADR 0007), then `/clear`.
   The `resume-inject.sh` hook (`SessionStart(compact|clear)`) re-injects `RESUME.md`
   afterward, so a cleared or autocompacted session resumes lean from files, not an
   accreted transcript. (`context-nudge.sh` only injects the guidance — a hook cannot

@@ -10,7 +10,8 @@
 #    Workflow-internal agents (isolated run) — so it is NOT the fix for workflow token
 #    burn; that fix is per-stage `opts.model` (discipline rule 10; orchestration skill).
 #  - It does NOT automate compaction. The durable checkpoint is .context/RESUME.md,
-#    committed by checkpoint.sh on PreCompact/Stop (ADR 0003). This only indexes
+#    committed by checkpoint.sh on PreCompact only (ADR 0003; the Stop trigger was
+#    removed 2026-07-21 — see ADR 0003 Consequences). This only indexes
 #    transcripts so they stay recoverable.
 #  - Best-effort: any failure degrades to path-only, or a no-op. Never blocks the
 #    session. SubagentStop delivers JSON on stdin with .transcript_path (no result text).

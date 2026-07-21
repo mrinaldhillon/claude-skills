@@ -1,18 +1,26 @@
 #!/usr/bin/env bash
 # Persists durable state so a session can be cleared and resumed from files.
 # Claude authors the file CONTENTS in-conversation; this script only stages
-# and commits them. Idempotent. Called from the PreCompact and Stop hooks and
-# from scripts/milestone-runner.sh. Cannot and does not run /compact or /clear.
+# and commits them. Idempotent. Called from the PreCompact hook and from
+# scripts/milestone-runner.sh. Cannot and does not run /compact or /clear.
+#
+# Deliberately NOT wired to Stop: Stop fires after every turn, so it landed a
+# commit per turn — automation commits interleaved with in-flight work, files
+# yanked out from under an edit in progress. PreCompact is the trigger that
+# guards against context loss; the runner calls this directly at iteration
+# boundaries. Do not re-add a Stop trigger.
 #
 # Commits ONLY on non-main branches (ADR 0002: PR-into-main is by discipline;
 # a hook must not land commits on the trunk). Commits by pathspec so unrelated
 # staged files are never swept into a checkpoint commit.
 #
 # Concurrency: parallel subagents run git in the repo, so index.lock
-# contention at Stop is expected, not exceptional. Index-writing steps retry
-# briefly and the checkpoint then SKIPS calmly (exit 0) — it is best-effort
-# by design; the next Stop retries, and anything left staged is swept into
-# that later checkpoint commit by the same pathspec rule.
+# contention at checkpoint time is expected, not exceptional. Index-writing
+# steps retry briefly and the checkpoint then SKIPS calmly (exit 0) — it is
+# best-effort by design; the next checkpoint (PreCompact, a runner iteration,
+# or a deliberate run) retries, and anything left staged is swept into that
+# later checkpoint commit by the same pathspec rule. Interactively that next
+# trigger can be far off — the land-step deliberate commit is the reliable path.
 set -euo pipefail
 
 cd "${CLAUDE_PROJECT_DIR:-.}"
@@ -87,7 +95,7 @@ done
 
 if [ "${#commit_paths[@]}" -eq 0 ]; then
   if [ "$add_busy" -eq 1 ]; then
-    echo "checkpoint: git index busy (another agent) — checkpoint skipped; the next Stop retries" >&2
+    echo "checkpoint: git index busy (another agent) — checkpoint skipped; the next checkpoint retries" >&2
   elif [ "$add_failed" -eq 1 ]; then
     echo "checkpoint: add failed (see stderr) — durable edits NOT committed" >&2
   else
@@ -102,12 +110,12 @@ else
   if [ "$rc" -eq 0 ]; then
     echo "checkpoint: committed durable state on $branch"
     if [ "$add_busy" -eq 1 ] || [ "$add_failed" -eq 1 ]; then
-      echo "checkpoint: some paths were not staged (busy/failed adds) — the next Stop sweeps them" >&2
+      echo "checkpoint: some paths were not staged (busy/failed adds) — the next checkpoint sweeps them" >&2
     fi
   elif [ "$rc" -eq 75 ]; then
-    echo "checkpoint: git index busy (another agent) — checkpoint skipped; the next Stop retries" >&2
+    echo "checkpoint: git index busy (another agent) — checkpoint skipped; the next checkpoint retries" >&2
   else
-    echo "checkpoint: commit failed (rc=$rc) — staged durable files remain for the next Stop" >&2
+    echo "checkpoint: commit failed (rc=$rc) — staged durable files remain for the next checkpoint" >&2
   fi
 fi
 exit 0

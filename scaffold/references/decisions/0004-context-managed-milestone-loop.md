@@ -85,6 +85,9 @@ compounds across iterations.
 - **Corrections to ADR 0003 (recorded here, annotated there):** (a) 0003:21 — the
   auto-compact override env vars exist on 2.1.204; (b) `Stop` hooks fire in `-p` mode,
   so the runner's explicit `checkpoint.sh` call is belt-and-suspenders, not a workaround.
+  *(Clause (b) superseded by ADR 0007, 2026-07-21: the checkpoint hook's `Stop` trigger
+  is removed from `hooks.json` — the runner's explicit calls are now the primary, and
+  only, checkpoint trigger inside a headless iteration, not a backstop.)*
 - **The honest operating envelope:** mechanical, well-specified milestones with intrinsic
   gates (build/test, not existence probes), on a branch, a human auditing the diff after.
   The loop's promise is *stops early and safely, resumes cheaply* — never *finishes

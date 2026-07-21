@@ -10,8 +10,10 @@
 # first failure. No retry: stop-and-triage (ADR 0004).
 #
 # Never --bare (would skip hooks + CLAUDE.md). Never --resume (context accretes;
-# the checkpoint files carry the state). Stop hooks DO fire in -p mode (verified,
-# CLI 2.1.204); the explicit checkpoint.sh call below is belt-and-suspenders.
+# the checkpoint files carry the state). The checkpoint hook fires on PreCompact
+# only (its per-turn Stop trigger was removed — it landed a commit every turn),
+# so the explicit checkpoint.sh calls below are what commit durable state at
+# each iteration boundary.
 #
 # Usage:
 #   scripts/milestone-runner.sh milestones/<name>.json
@@ -299,7 +301,8 @@ Then stop. Do not begin another chunk."
     echo "runner: .context/MILESTONE_DONE names '$done_name' (≠ '$milestone') — ignoring, continuing" >&2
   fi
 
-  # Belt-and-suspenders: Stop hooks fire in -p mode too; this is idempotent.
+  # Primary checkpoint for headless iterations (the hook has no Stop trigger);
+  # idempotent.
   CLAUDE_PROJECT_DIR="$repo" bash "$checkpoint_sh" >/dev/null 2>&1 || true
 done
 
