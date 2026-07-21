@@ -48,6 +48,7 @@ Reach a safe stopping point now. Before doing anything else:
 1. Update .context/project-context.md — goal, files touched, decisions, and the exact next step.
 2. Append any new ADRs under docs/decisions/.
 3. Write the single next action to .context/RESUME.md.
+4. Commit those durable files on your branch (never on main) — /clear fires no PreCompact, so no hook commits them for you.
 Then ask the user to run /clear and resume from those files. Do NOT start new work in this session."
 
 if [ "$event" != "PostToolUse" ]; then

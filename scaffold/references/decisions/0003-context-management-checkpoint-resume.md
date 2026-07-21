@@ -5,8 +5,9 @@
 - **Supersedes:** —
 - **Superseded by:** [0004](0004-context-managed-milestone-loop.md) — runner-mechanism
   clause of §5 only; [0005](0005-agent-state-in-context-dir.md) — location clauses
-  (§4 resume pointer, Consequences `docs/` placement) only; the rest of this ADR
-  remains in force
+  (§4 resume pointer, Consequences `docs/` placement) only;
+  [0007](0007-remove-stop-checkpoint-trigger.md) — checkpoint-trigger clause of §3 and
+  the Stop/`/clear` Consequences bullets only; the rest of this ADR remains in force
 
 ## Context
 
@@ -44,6 +45,10 @@ Durable state lives in **files**; the session is disposable. The mechanism:
    — but **only on non-main branches** (ADR 0002: PR-into-`main` is by discipline), committing
    by pathspec so unrelated staged files are never swept in, and only over paths with a
    staged change (an empty `docs/decisions/` must not abort the commit).
+   *(Superseded by ADR 0007, 2026-07-21: the `Stop` trigger is removed — it fired after
+   every turn and landed a commit per turn, interleaving automation commits with
+   in-flight work. `PreCompact`, the milestone runner's direct calls, and a deliberate
+   land-step commit are the triggers of record.)*
 4. **Resume pointer** is the in-repo, committed `docs/RESUME.md` — one canonical location,
    superseding both the earlier per-user memory-dir `resume.md` and an initial `.claude/state/`
    placement (see Consequences). `SessionStart(compact)` re-injects it after any compaction
@@ -60,16 +65,20 @@ checkpoints before the summary and `SessionStart` restores the pointer after.
 ## Consequences
 
 - Working state survives `/clear`, an unexpected compaction, and a machine change, because it
-  is committed to the branch.
+  is committed to the branch. *(Qualified by ADR 0007: `/clear` fires no `PreCompact`, so on
+  that path "committed" holds only once the land step's deliberate commit runs; on-disk
+  survival is unaffected either way.)*
 - The system pays off on long milestones; on short chats the always-loaded overhead (the
   CLAUDE.md protocol section, the per-prompt hook) is pure cost. Measuring the delta with
   `/usage` is a documented follow-up, not part of this change.
 - Checkpoints never land on `main`; a milestone must run on a branch.
-- The `Stop` checkpoint fires at every turn end, but is a no-op unless a durable file
-  actually changed, and commits only a narrow pathspec. Trade-off: on a feature branch it
-  will commit a checkpoint-file edit on its own the moment a turn ends — so a
-  `docs/project-context.md` change meant to ship together with code should be staged and
-  committed deliberately rather than left for the hook.
+- ~~The `Stop` checkpoint fires at every turn end~~ *(removed by ADR 0007, 2026-07-21)*: the per-turn
+  trigger's "no-op unless a durable file changed" guard was not enough — any turn that
+  touched a durable file landed an automation commit mid-flight. Checkpoint commits now
+  land only at `PreCompact` and at the runner's iteration boundaries. Trade-off: durable
+  edits sit uncommitted on disk between those points, so a `docs/project-context.md`
+  change meant to ship together with code should be staged and committed deliberately
+  rather than left for the hook.
 - `jq` is now a soft dependency (already used by `validate-config`); the status line and nudge
   degrade to a no-op without it.
 - **The resume pointer lives in `docs/`, not `.claude/state/`, because `.claude/` is not

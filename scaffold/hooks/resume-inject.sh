@@ -2,10 +2,11 @@
 # Re-inject the curated resume file into the window after a context reset.
 #
 # Wired on SessionStart(compact|clear): fires after an autocompact replaces the
-# conversation with a lossy summary, or after a deliberate /clear. checkpoint.sh
-# WRITES .context/RESUME.md before loss (Stop/PreCompact); this reads it BACK
-# afterward — closing the checkpoint->resume loop so a reset session resumes
-# from the curated substrate, not just the auto-summary.
+# conversation with a lossy summary, or after a deliberate /clear. Claude WRITES
+# .context/RESUME.md before the reset (checkpoint.sh commits it at PreCompact;
+# the /clear path relies on the land-step commit — ADR 0007); this reads it BACK
+# from disk afterward — closing the checkpoint->resume loop so a reset session
+# resumes from the curated substrate, not just the auto-summary.
 #
 # Bridge-free (needs no context-window data), so unlike the proactive
 # context-nudge it ships as a plugin hook rather than project-wired config.
