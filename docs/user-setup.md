@@ -50,6 +50,13 @@ per-project — but the guidance itself still holds. Paste it as-is:
 > only; authoring mechanics belong to `superpowers:writing-skills`. See the marketplace README's
 > [Relationship to `superpowers`](../README.md#relationship-to-superpowers).
 
+> **The two precedence claims in the quote are probe-confirmed, not stale (2026-07-21, Claude Code
+> 2.1.217) — left as written because both are accurate.** "skills resolve user-over-project" holds:
+> a user-scope skill silently shadows a same-named project skill. And the review agents being
+> "project-overridable" holds: a project-scope agent wins over a same-named `~/.claude/agents/` copy
+> (invocation-probed). Note these are the *user-vs-project* axis; it is distinct from *plugin*
+> skills/agents, which are namespaced and coexist with a repo's own — see the plugin READMEs.
+
 > # Claude Code operating discipline
 >
 > How to run Claude Code itself. The voice is the `distinguished-engineer` output style; the

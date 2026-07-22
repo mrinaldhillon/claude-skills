@@ -48,8 +48,11 @@ Once installed from the `mrinal-skills` marketplace, components are namespaced:
   change that. Explicit slash form: `/core:cost-aware-delegation`, `/core:orchestration`,
   `/core:git-workflow`, `/core:deep-research-tiered`.
 - Agents: dispatch as subagent type `core:advisor-plus`, `core:code-reviewer`, `core:search`,
-  `core:doc-sync`, `core:config-auditor`. (Agents resolve project-over-user, so a repo's own tuned
-  agent of the same name still wins.)
+  `core:doc-sync`, `core:config-auditor`. (User- vs project-scope agents resolve
+  **project-over-user**: a repo's own tuned agent of the same bare name wins over a same-named
+  `~/.claude/agents/` copy — invocation-probed 2026-07-21 on Claude Code 2.1.217. This is a
+  *different axis* from plugin agents, which are namespaced and simply **coexist** — `core:X` never
+  collides with a project `X`, so neither shadows the other.)
 - Output style: select `distinguished-engineer` via `/output-style` — it is **not** `force-for-plugin`,
   so enabling core never silently overrides your active style.
 - Hooks activate automatically when the plugin is enabled; they **merge** with your user/project hooks
