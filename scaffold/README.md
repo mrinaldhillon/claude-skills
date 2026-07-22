@@ -14,9 +14,11 @@ never shadows a repo's own tuned `milestone-workflow`.
 > `code-reviewer` and `git-workflow` components and for `doc-sync` (as do `/goal` and `/milestone`);
 > `skill-maintenance` names `doc-sync` only to disclaim it — the in-PR sync rule is discipline rule 6,
 > not that skill's; and `/milestone` + `subagent-trail` name `orchestration` — all of which ship in
-> `core`. These are bare-name **prose** references (no literal `subagent_type` dispatch): they resolve
-> by description and let a repo's own tuned agent of the same name win, so they are intentionally not
-> `core:`-qualified.
+> `core`. These are bare-name **prose** references (no literal `subagent_type` dispatch): they name
+> `code-reviewer` / `doc-sync` / `orchestration` in prose and resolve by description. They are
+> intentionally not `core:`-qualified so that in a repo which tunes one of these, the tuned copy — which
+> **coexists** with the plugin's namespaced `core:…` copy, neither shadowing the other — is available to
+> satisfy the reference.
 
 ## Enable per-project
 
