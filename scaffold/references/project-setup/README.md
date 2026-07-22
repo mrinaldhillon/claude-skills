@@ -124,10 +124,18 @@ would have shipped). Do this on a `chore/adopt-plugins` branch:
      them into the plugin, or accept the plugin default). Do NOT re-wire the
      tuned copy in `settings.json` to "restore" it — that double-fires against
      the plugin's hook (see the complement rule above). (This merge behaviour
-     is specific to **hooks**. Tuned project **skills** coexist with the
-     namespaced plugin ones, and a tuned **agent** of the same name wins by
-     project-over-plugin precedence — so those keep working with no re-wiring
-     concern.) Never delete a tuned file without reading what it changed.
+     is specific to **hooks**. Tuned project **skills** and **agents** behave
+     differently: a plugin skill/agent is namespaced (`core:X` / `scaffold:X`),
+     so the plugin copy and your same-named project copy **both register and
+     coexist** — nothing is shadowed, and no re-wiring is involved. There is no
+     project-over-plugin precedence for agents; steer dispatch to your tuned
+     copy through its **description** — e.g. *"Prefer this over `core:X` — same
+     review plus \<this repo's gates/paths/bindings\>"* — which is how consuming
+     repos actually disambiguate.) *(A 2026-07-21 live-registry probe on Claude
+     Code 2.1.217 listed both `code-reviewer` and `core:code-reviewer`,
+     confirming coexistence; an earlier version of this note wrongly said the
+     project agent "wins by project-over-plugin precedence.")* Never delete a
+     tuned file without reading what it changed.
 2. Enable `core` and `scaffold` (§1).
 3. Rewrite `.claude/settings.json` to the complement shape (§2): drop any
    wiring for hooks you deleted in step 1, keep `statusLine`, `context-nudge`,
