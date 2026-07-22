@@ -15,6 +15,14 @@
 #   cooldown so the notice doesn't repeat on every tool call and a
 #   bridge-staleness mtime fallback for pre-session-id bridge files.
 #
+# The staleness guard is deliberately NOT applied to UserPromptSubmit: the
+# bridge refreshes only while an interactive statusline renders, so after an
+# idle stretch a legitimate bridge is arbitrarily old and any short bound would
+# swallow the nudge at exactly the moment it matters. The cost is that a
+# pre-session-id bridge (no `session_id` to compare) can nudge from stale or
+# foreign data on that path — closed by refreshing statusline.sh, which the
+# setup guide's migration checklist requires. Don't "fix" this with STALE_S.
+#
 # A hook cannot run /compact or /clear — this only injects guidance; the
 # checkpoint-and-clear happens in-conversation (ADR 0003/0004).
 set -euo pipefail
