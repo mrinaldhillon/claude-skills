@@ -5,7 +5,8 @@
 # garbage or a missing bridge file. PostToolUse (mid-turn): hookSpecificOutput
 # JSON instead of plain stdout, cooldown between repeat nudges, band-escalation
 # override, and a bridge-staleness guard (headless -p must never see a leftover
-# interactive percentage).
+# interactive percentage). Cross-session guard: a bridge stamped with another
+# session's id must silence both paths. Surface log: written once, deduplicated.
 #
 # Runs in a mktemp sandbox (CLAUDE_PROJECT_DIR points there) — never touches
 # the real repo's .claude/state. All hook invocations go through run helpers
@@ -16,7 +17,7 @@
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$here/.." && pwd)"
-hook="$REPO/scaffold/references/project-setup/context-nudge.sh"
+hook="$REPO/scaffold/hooks/context-nudge.sh"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -33,6 +34,8 @@ assert_empty()        { [ -z "$1" ] || { echo "FAIL: expected empty output, got 
 legacy()   { bash "$hook" </dev/null || printf 'HOOK_FAILED(rc=%s)' "$?"; }
 prompt()   { printf '{"hook_event_name":"UserPromptSubmit"}' | bash "$hook" || printf 'HOOK_FAILED(rc=%s)' "$?"; }
 posttool() { printf '{"hook_event_name":"PostToolUse","tool_name":"Read"}' | bash "$hook" || printf 'HOOK_FAILED(rc=%s)' "$?"; }
+prompt_sid()   { printf '{"hook_event_name":"UserPromptSubmit","session_id":"%s"}' "$1" | bash "$hook" || printf 'HOOK_FAILED(rc=%s)' "$?"; }
+posttool_sid() { printf '{"hook_event_name":"PostToolUse","tool_name":"Read","session_id":"%s"}' "$1" | bash "$hook" || printf 'HOOK_FAILED(rc=%s)' "$?"; }
 
 # --- legacy path (UserPromptSubmit stdout; empty stdin must behave the same) ---
 
@@ -99,6 +102,32 @@ rm -f "$last"                                     # stale bridge (headless guard
 echo '{"used_percentage": 67}' > "$state"         # mtime far in the past → silent
 touch -mt 202601010000 "$state"
 assert_empty "$(posttool)"
+
+# --- cross-session guard: bridge session id vs payload session id -------------
+
+rm -f "$last"
+echo '{"used_percentage": 58, "session_id": "sess-A"}' > "$state"
+assert_contains "$(prompt_sid sess-A)" "checkpoint threshold"   # own bridge: nudges
+assert_empty "$(prompt_sid sess-B)"                             # foreign bridge: silent
+out="$(posttool_sid sess-A)"                                    # own bridge, fresh: nudges
+assert_contains "$out" "hookSpecificOutput"
+rm -f "$last"
+assert_empty "$(posttool_sid sess-B)"                           # foreign, even fresh + no cooldown: silent
+
+# id on one side only → guard degrades to the legacy behavior (compat with
+# pre-session-id bridge files and manual payload-less runs)
+echo '{"used_percentage": 58}' > "$state"
+assert_contains "$(prompt_sid sess-A)" "checkpoint threshold"
+echo '{"used_percentage": 58, "session_id": "sess-A"}' > "$state"
+assert_contains "$(prompt)" "checkpoint threshold"
+
+# --- surface logger: written on first invocation, deduplicated thereafter -----
+# Every run above shares one (bundle, execpath) pair, so the log must hold
+# exactly one line no matter how many hook invocations this suite made.
+slog="$tmp/.claude/state/hook-surface-log.jsonl"
+[ -f "$slog" ] || { echo "FAIL: surface log not written"; fail=1; }
+[ -f "$slog" ] && [ "$(wc -l < "$slog")" -eq 1 ] \
+  || { echo "FAIL: surface log not deduplicated"; fail=1; }
 
 if [ "$fail" -eq 0 ]; then echo "ALL PASS"; fi
 exit "$fail"

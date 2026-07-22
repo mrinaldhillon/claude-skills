@@ -22,32 +22,33 @@ Copy `settings.example.json` to your repo's `.claude/settings.json`. It wires
 **only**:
 
 - `statusLine` (the context-usage statusline)
-- `context-nudge` on `PostToolUse` (matcher `*`) and `UserPromptSubmit`
-- `SessionStart` (matcher `compact`) → `cat .context/RESUME.md`
 - three `<PLACEHOLDER bootstrap>` hooks you fill in for your stack: format-on-save
   (`PostToolUse`, matcher `Write|Edit`), an offline check (`Stop`), and an
   environment probe (`SessionStart`, matcher `startup|resume`)
 
-**Never wire `checkpoint`, `subagent-trail`, `validate-config`,
+**Never wire `checkpoint`, `context-nudge`, `subagent-trail`, `validate-config`,
 `block-main-writes`, or `guard-secrets` in your project settings.** They are
 provided by the plugins' own `hooks.json` (`scaffold/hooks/hooks.json` and
 `core/hooks/hooks.json`) and load automatically the moment the plugin is
 enabled. Wiring them again in `.claude/settings.json` double-fires them on every
 matching event: two `checkpoint.sh` invocations race on the git `index.lock`,
-and `subagent-trail` writes a duplicate breadcrumb per subagent stop. This file
-is a **complement** to the plugins' hooks, not a replacement or a copy of them —
-it exists only because a plugin cannot set project-local keys like `statusLine`
-or reach a project's own `.context/RESUME.md` by a fixed relative path.
+`subagent-trail` writes a duplicate breadcrumb per subagent stop, and a
+double-wired `context-nudge` evaluates twice per tool call and injects its
+notice twice at every threshold crossing. This file is a **complement** to the
+plugins' hooks, not a replacement or a copy of them — it exists only because a
+plugin cannot set project-local keys like `statusLine`.
 
-## 3. Optional context-usage nudges
+## 3. Context-usage statusline (the nudge hook's bridge)
 
-If you want the statusline and the 55%/65% context nudges, copy
-[`statusline.sh`](statusline.sh) and [`context-nudge.sh`](context-nudge.sh) into
-your repo's `.claude/` — `settings.example.json` already wires both. They share
-a bridge file, `.claude/state/context-usage.json`, written by the statusline and
-read by the nudge hook — **keep them together and version them as a pair.**
-They live project-local (not in a plugin) because a plugin cannot set the
-`statusLine` settings key.
+The 55%/65% context nudges ship in the plugin (`scaffold/hooks/context-nudge.sh`,
+ADR 0008) — do not copy or wire the hook. What the plugin cannot ship is the
+bridge *writer*: copy [`statusline.sh`](statusline.sh) into your repo's
+`.claude/` — `settings.example.json` already wires it via the `statusLine` key,
+the one thing a plugin cannot set. It publishes
+`.claude/state/context-usage.json` (percentage + `session_id`), which the
+plugin's nudge hook reads; without it the hook is a silent no-op. When the
+plugin's hook evolves, refresh your statusline copy too — the bridge schema is
+their shared contract.
 
 ## 4. Branch before your first commit
 
@@ -138,9 +139,11 @@ would have shipped). Do this on a `chore/adopt-plugins` branch:
      tuned file without reading what it changed.
 2. Enable `core` and `scaffold` (§1).
 3. Rewrite `.claude/settings.json` to the complement shape (§2): drop any
-   wiring for hooks you deleted in step 1, keep `statusLine`, `context-nudge`,
-   the `SessionStart(compact)` → `RESUME.md` line, and the three bootstrap
-   placeholders.
+   wiring for hooks you deleted in step 1 — including `context-nudge` and any
+   `SessionStart` → `RESUME.md` line (`resume-inject` ships in the plugin) —
+   keeping only `statusLine` and the three bootstrap placeholders.
 4. Re-verify: nothing in your final `.claude/settings.json` wires `checkpoint`,
-   `subagent-trail`, `validate-config`, `block-main-writes`, or `guard-secrets`
-   (§2) — those come from the plugins now.
+   `context-nudge`, `subagent-trail`, `validate-config`, `block-main-writes`,
+   or `guard-secrets` (§2) — those come from the plugins now. Delete any
+   project copy of `context-nudge.sh` in the same change: hooks merge, and a
+   leftover wired copy double-fires the nudge on every tool call.
