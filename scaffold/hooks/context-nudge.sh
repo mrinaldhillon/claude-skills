@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
-# Context-nudge hook, dual-mode (ADR 0004). Reads context usage from the
-# statusline bridge file and nudges Claude to checkpoint once usage crosses a
-# threshold.
+# Context-nudge hook, dual-mode (ADR 0004; plugin-shipped since ADR 0008).
+# Reads context usage from the statusline bridge file and nudges Claude to
+# checkpoint once usage crosses a threshold. The bridge writer stays a
+# project-local file (references/project-setup/statusline.sh) — a plugin
+# cannot set the statusLine settings key; without the bridge this hook is a
+# cheap no-op.
 #
 # UserPromptSubmit (legacy): plain stdout on exit 0 is added to Claude's context.
 # PostToolUse (mid-turn):    stdout is NOT injected for this event; emit
 #   {"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":…}}
-#   instead. Guards: a cooldown so the notice doesn't repeat on every tool call,
-#   and a bridge-staleness check so a leftover interactive percentage never
-#   nudges a headless -p session (the statusline doesn't render there).
+#   instead. Guards: a session-identity check on BOTH events (the bridge names
+#   the session whose statusline wrote it, so a leftover percentage never
+#   nudges a headless -p or foreign session); plus, PostToolUse-only, a
+#   cooldown so the notice doesn't repeat on every tool call and a
+#   bridge-staleness mtime fallback for pre-session-id bridge files.
 #
 # A hook cannot run /compact or /clear — this only injects guidance; the
 # checkpoint-and-clear happens in-conversation (ADR 0003/0004).
@@ -19,8 +24,24 @@ LAND_PCT=65      # land now — checkpoint and clear (below the auto-compact tri
 COOLDOWN_S=300   # PostToolUse: min seconds between repeat nudges in the same band
 STALE_S=120      # PostToolUse: ignore a bridge file older than this
 
-command -v jq >/dev/null 2>&1 || exit 0
 dir="${CLAUDE_PROJECT_DIR:-.}"
+
+# Surface log: one line per unique host surface — (bundle id, execpath) pair —
+# that has ever run this hook, so "do plugin hooks fire in <host X>" (an IDE
+# panel, a headless runner) becomes observable without a dedicated test
+# sitting. Sits BEFORE the jq guard on purpose: an embedded host may lack a
+# Homebrew PATH, so a jq-gated logger would go silent on exactly the surface
+# under test. Writes to .claude/state/ (gitignored per the setup guide); must
+# never fail or slow the hook.
+sl_line="{\"bundle\":\"${__CFBundleIdentifier:-}\",\"execpath\":\"${CLAUDE_CODE_EXECPATH:-}\"}"
+sl_file="$dir/.claude/state/hook-surface-log.jsonl"
+if ! grep -qsF "$sl_line" "$sl_file" 2>/dev/null; then
+  { mkdir -p "$dir/.claude/state" &&
+    printf '{"first_seen":"%s","surface":%s}\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$sl_line" >>"$sl_file"; } 2>/dev/null || true
+fi
+
+command -v jq >/dev/null 2>&1 || exit 0
 state_file="$dir/.claude/state/context-usage.json"
 [ -f "$state_file" ] || exit 0
 
@@ -28,6 +49,18 @@ state_file="$dir/.claude/state/context-usage.json"
 input=""
 [ -t 0 ] || input="$(cat || true)"
 event="$(jq -r '.hook_event_name // ""' <<<"$input" 2>/dev/null || echo "")"
+
+# Cross-session guard: the bridge records which session's statusline wrote it.
+# If both sides carry a session id and they differ, this hook is running in a
+# session the bridge does not describe (headless -p, another window, in-IDE) —
+# the percentage is someone else's; stay silent on every path. A missing id on
+# either side degrades to the per-path behavior below, where the PostToolUse
+# staleness guard still covers pre-session-id bridge files.
+sid="$(jq -r '.session_id // ""' <<<"$input" 2>/dev/null || echo "")"
+bridge_sid="$(jq -r '.session_id // ""' "$state_file" 2>/dev/null || echo "")"
+if [ -n "$sid" ] && [ -n "$bridge_sid" ] && [ "$sid" != "$bridge_sid" ]; then
+  exit 0
+fi
 
 pct="$(jq -r '.used_percentage // 0' "$state_file" 2>/dev/null || echo 0)"
 # Round, don't truncate: 64.999 must cross a 65 threshold at the same instant

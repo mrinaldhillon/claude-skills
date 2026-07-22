@@ -51,7 +51,8 @@ project-scoped plugin.) Because it is project-scoped, the checkpoint/context hoo
 | agent   | `determinism-auditor`  | Advisory pre-scan for the five determinism/hot-path footguns; genericized (no `<PLACEHOLDER>`). Relevant only to projects with a replay/append-only invariant. Sonnet; terminal. |
 | hook    | `block-main-writes`    | PreToolUse(Bash): denies `git commit`/`merge`/`push` while the checkout is on `main` (trunk-based backstop). Project-scoped here so trunk-PR discipline is **opt-in per repo**, not global — moved out of `core` for exactly that reason. |
 | hook    | `checkpoint`           | PreCompact: commit durable state (`.context/`, `docs/decisions/`) on non-`main` branches; the milestone runner also calls it directly at iteration boundaries. Deliberately not wired to Stop — a per-turn trigger landed a commit every turn, interleaving automation commits with in-flight work. No-ops when the substrate is absent; activates once you create `.context/` (see `references/project-setup/`). Retries under index.lock contention from parallel subagents, then skips calmly (best-effort; the next checkpoint retries). |
-| hook    | `resume-inject`        | SessionStart(compact\|clear): re-inject `.context/RESUME.md` into the fresh window after an autocompact or `/clear` — the read-back complement to `checkpoint`'s write, closing the checkpoint→resume loop. No-op when `RESUME.md` is absent. Bridge-free, so it ships as a plugin hook (the proactive context-nudge stays project-wired — it needs the status-line bridge). |
+| hook    | `context-nudge`        | UserPromptSubmit + PostToolUse(*): inject a checkpoint nudge at 55% (watch) / 65% (land) context usage, read from the status-line bridge (`.claude/state/context-usage.json`). Session-identity guard: silent when the bridge belongs to another session sharing the checkout (the cross-session leak an mtime check cannot catch). Cheap no-op until the project wires the bridge (`references/project-setup/statusline.sh`). ADR 0008. |
+| hook    | `resume-inject`        | SessionStart(compact\|clear): re-inject `.context/RESUME.md` into the fresh window after an autocompact or `/clear` — the read-back complement to `checkpoint`'s write, closing the checkpoint→resume loop. No-op when `RESUME.md` is absent. |
 | hook    | `subagent-trail`       | SubagentStop: append-only breadcrumb index of Agent-tool subagent transcripts for post-compaction recovery. |
 | hook    | `validate-config`      | PostToolUse(Write\|Edit): validate `.claude/` JSON + frontmatter on edit. |
 
@@ -69,12 +70,15 @@ Skills/agents/commands auto-discover from their directories; hooks load from `ho
 > [`references/project-setup/docs/dev-workflow.md`](references/project-setup/docs/dev-workflow.md),
 > alongside the other substrate you adapt by hand. Same reasoning as the no-generator rule below.
 
-> **`context-nudge` is intentionally not here.** Its substrate — `.claude/state/context-usage.json` —
-> is written by a statusline bridge (`statusline.sh` + the `statusLine` settings key), and a plugin's
-> `hooks.json` cannot contribute a `statusLine`. Shipping the hook alone would be a permanently-dead
-> artifact. `statusline.sh` + `context-nudge.sh` are documented, project-local files instead — see
-> [`references/project-setup/`](references/project-setup) — copied by hand into a repo's `.claude/`,
-> never shipped by the plugin.
+> **`context-nudge` ships here since 0.7.0** (ADR
+> [0008](references/decisions/0008-graduate-context-nudge-into-plugin.md), reversing the earlier
+> "intentionally not here" stance). The split is structural: a plugin cannot set the `statusLine`
+> settings key (only `agent`/`subagentStatusLine` are plugin-settable), so the thin, stable bridge
+> writer — `statusline.sh` — stays a project-local copy, while the complex, evolving hook half now
+> updates by version bump instead of rotting as a hand copy. Without the bridge the hook is a ~1 ms
+> no-op, not a dead artifact. **Consumers upgrading to 0.7.0 must delete their project-side
+> `context-nudge` copy and its `settings.json` wiring in the same change** — hooks merge, so any
+> overlap double-fires the nudge on every tool call.
 
 ## No generator — `references/project-setup` instead
 
@@ -86,7 +90,7 @@ script. See [`references/project-setup/README.md`](references/project-setup/READ
 full guide (enabling the plugins, the `settings.json` complement rule, the `.context/`/ADR
 conventions, and a migration checklist for existing starter-derived repos) and
 [`references/project-setup/`](references/project-setup) for the reference examples themselves
-(`settings.example.json`, `statusline.sh`, `context-nudge.sh`, the ADR/doc skeletons).
+(`settings.example.json`, `statusline.sh`, the ADR/doc skeletons).
 
 The old cross-repo template-diff step remains obsoleted by plugin versioning: its job was to
 git-diff a project's *forked copies* of the shared steering layer against the upstream template

@@ -7,7 +7,9 @@
   clause of §5 only; [0005](0005-agent-state-in-context-dir.md) — location clauses
   (§4 resume pointer, Consequences `docs/` placement) only;
   [0007](0007-remove-stop-checkpoint-trigger.md) — checkpoint-trigger clause of §3 and
-  the Stop/`/clear` Consequences bullets only; the rest of this ADR remains in force
+  the Stop/`/clear` Consequences bullets only;
+  [0008](0008-graduate-context-nudge-into-plugin.md) — the project-local placement of
+  §2 only; the rest of this ADR remains in force
 
 ## Context
 
@@ -40,6 +42,9 @@ Durable state lives in **files**; the session is disposable. The mechanism:
 2. **Context-nudge hook** (`.claude/hooks/context-nudge.sh`, `UserPromptSubmit`) injects a
    checkpoint nudge at 55% (watch) and 65% (land), both below the default auto-compact
    trigger, so the agent checkpoints and the user clears before a summary ever fires.
+   *(Placement evolved by ADR 0008, 2026-07-22: the hook ships in the scaffold plugin's
+   `hooks.json`, dual-mode per ADR 0004, with a session-identity guard; the statusline
+   bridge stays project-local. The thresholds and mechanism stand.)*
 3. **Checkpoint script** (`.claude/hooks/checkpoint.sh`, on `PreCompact` and `Stop`) commits
    the durable files — `docs/project-context.md`, `docs/decisions/`, `docs/RESUME.md`
    — but **only on non-main branches** (ADR 0002: PR-into-`main` is by discipline), committing

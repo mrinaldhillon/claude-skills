@@ -11,16 +11,7 @@
         "hooks": [
           { "type": "command", "command": "true  # <PLACEHOLDER bootstrap>: format-on-save — set to your formatter, e.g. gofmt -w . / prettier -w . / cargo fmt / ruff format ." }
         ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/context-nudge.sh\"" }
-        ]
       }
-    ],
-    "UserPromptSubmit": [
-      { "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/context-nudge.sh\"" } ] }
     ],
     "Stop": [
       {

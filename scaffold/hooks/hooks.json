@@ -20,6 +20,25 @@
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/validate-config.sh\""
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/context-nudge.sh\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/context-nudge.sh\""
+          }
+        ]
       }
     ],
     "PreCompact": [
