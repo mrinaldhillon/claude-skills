@@ -8,8 +8,8 @@
 # from disk afterward — closing the checkpoint->resume loop so a reset session
 # resumes from the curated substrate, not just the auto-summary.
 #
-# Bridge-free (needs no context-window data), so unlike the proactive
-# context-nudge it ships as a plugin hook rather than project-wired config.
+# Bridge-free: needs no context-window data, so unlike context-nudge (which
+# reads the project-local statusline bridge) it has nothing project-local at all.
 #
 # Output contract: for a SessionStart hook, stdout on exit 0 is added to
 # Claude's context (Claude Code hooks reference — as for UserPromptSubmit).

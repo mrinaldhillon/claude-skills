@@ -30,12 +30,41 @@ Two things changed:
    authored downstream and back-ported here — exactly the drift the plugin layer
    exists to prevent.
 
-Verified against current docs (2026-07-22): a plugin's own `settings.json` supports
-only `agent` and `subagentStatusLine`; there is no mechanism for a plugin to set the
-main `statusLine`, and `${CLAUDE_PLUGIN_ROOT}` does not expand in a user's own
-`settings.json`. Plugin `hooks.json` supports `UserPromptSubmit` and `PostToolUse`
-identically to project hooks (code.claude.com/docs/en/plugins-reference, /statusline,
-/hooks).
+## Verification
+
+Measured 2026-07-22 against Claude Code 2.1.217 — treat each as a refutable
+hypothesis and re-probe on version bumps.
+
+1. **A plugin cannot set `statusLine`.** Its own `settings.json` supports only the
+   `agent` and `subagentStatusLine` keys (plugins-reference, plugin-structure table);
+   `${CLAUDE_PLUGIN_ROOT}` does not expand in a user's own `settings.json` either.
+   This is what forces the split — it is not a stylistic choice.
+2. **No hook payload carries main-session context-window data.** The full hooks
+   reference documents no `context_window`/`used_percentage`/`exceeds_200k_tokens`
+   field on any event: `Stop` carries `stop_hook_active`/`last_assistant_message`/
+   `background_tasks`/`session_crons`, `SessionEnd` carries `reason`, `PreCompact`
+   carries `trigger`/`custom_instructions`, `PostCompact` carries `trigger`/
+   `compact_summary`. In the 2.1.217 binary, `context_window_size`/`current_usage`/
+   `used_percentage`/`remaining_percentage` appear in exactly one place — the
+   `tengu_status_line_result` payload constructor — with no hook code path. And a
+   headless `claude -p --output-format json` terminal result carries raw `usage`
+   token counts but no `context_window_size`: the numerator without the denominator.
+   *(Narrow exception, no help here: `PostToolUse` on a completed `Agent` call
+   carries `tool_response.totalTokens`/`usage` — that is subagent cost, not this
+   session's context.)*
+   **Consequence: the statusline bridge is the only live source, so this split is
+   the only shape available — not merely the preferred one.** Rejected alternatives:
+   deriving a percentage from `transcript_path` (`message.usage` gives the three
+   numerator terms, but the context limit is published only on the statusline
+   payload — a hardcoded 200k/1M guess is wrong in both directions), and
+   `PreCompact(auto)` (a real bridge-free signal, but it fires *after* the window
+   filled, which is the failure this design exists to pre-empt).
+3. **Plugin `hooks.json` supports `UserPromptSubmit` and `PostToolUse`** identically
+   to project hooks; `UserPromptSubmit` stdout on exit 0 becomes context, while
+   `PostToolUse` requires `hookSpecificOutput.additionalContext` — hence dual mode.
+
+Sources: code.claude.com/docs/en/{plugins-reference,statusline,hooks}; `strings` on
+the 2.1.217 binary; a live headless `--output-format json` run.
 
 ## Decision
 
@@ -65,8 +94,16 @@ identically to project hooks (code.claude.com/docs/en/plugins-reference, /status
   twice. The setup guide's complement rule now lists `context-nudge` among the
   never-wire-in-project hooks.
 - Repos without the statusline bridge pay a ~1 ms no-op per prompt/tool event.
-- The consumer's statusline copy should be refreshed to the session-id-stamping
-  version; an old bridge (no `session_id`) keeps working via the degraded path but
-  stays exposed to the cross-session leak the guard exists to close.
-- `.claude/state/` gains `hook-surface-log.jsonl` (already gitignored per the setup
-  guide's §5 convention).
+- **The consumer's statusline copy MUST be refreshed in the same change** — it is a
+  numbered step in the migration checklist, not advice. An old bridge (no
+  `session_id`) leaves the guard inert, and only `PostToolUse` has a fallback: it
+  refuses a bridge older than `STALE_S`. `UserPromptSubmit` has no staleness
+  backstop *by design* — the bridge refreshes only while an interactive statusline
+  renders, so any short bound would swallow legitimate nudges after an idle
+  stretch — so on that path a stale or foreign bridge nudges on every prompt. The
+  failure is silent: nothing errors, the notice is simply wrong. Refresh, don't
+  rely on the degraded path.
+- `.claude/state/` gains `hook-surface-log.jsonl`, created on the first event in
+  **any** scaffold-enabled repo — bridge or no bridge, since the logger deliberately
+  precedes every guard. The setup guide's §5 `.gitignore` line therefore stops being
+  optional for repos that adopt `scaffold` without the statusline; §2 now says so.

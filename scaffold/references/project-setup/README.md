@@ -38,6 +38,11 @@ notice twice at every threshold crossing. This file is a **complement** to the
 plugins' hooks, not a replacement or a copy of them — it exists only because a
 plugin cannot set project-local keys like `statusLine`.
 
+Do §5's `.gitignore` line even if you skip the statusline: `context-nudge` writes
+`.claude/state/hook-surface-log.jsonl` (one line per host surface it has ever
+fired on) on its first event in **any** scaffold-enabled repo, bridge or no
+bridge. Ignoring `.claude/state/` is what keeps that out of `git status`.
+
 ## 3. Context-usage statusline (the nudge hook's bridge)
 
 The 55%/65% context nudges ship in the plugin (`scaffold/hooks/context-nudge.sh`,
@@ -49,6 +54,14 @@ the one thing a plugin cannot set. It publishes
 plugin's nudge hook reads; without it the hook is a silent no-op. When the
 plugin's hook evolves, refresh your statusline copy too — the bridge schema is
 their shared contract.
+
+**A pre-0.7.0 statusline copy is a silent half-upgrade.** Its bridge carries no
+`session_id`, so the hook's cross-session guard has nothing to compare and
+degrades to open. `PostToolUse` still refuses a bridge older than 120 s, but
+`UserPromptSubmit` has no staleness backstop by design (the bridge only refreshes
+while an interactive statusline renders, so any short bound would eat legitimate
+nudges after an idle stretch) — which means a stale or foreign bridge nudges on
+every prompt. Re-copy `statusline.sh` in the same change that adopts 0.7.0.
 
 ## 4. Branch before your first commit
 
@@ -142,7 +155,14 @@ would have shipped). Do this on a `chore/adopt-plugins` branch:
    wiring for hooks you deleted in step 1 — including `context-nudge` and any
    `SessionStart` → `RESUME.md` line (`resume-inject` ships in the plugin) —
    keeping only `statusLine` and the three bootstrap placeholders.
-4. Re-verify: nothing in your final `.claude/settings.json` wires `checkpoint`,
+4. **Re-copy [`statusline.sh`](statusline.sh)** over your project's copy. Since
+   0.7.0 the bridge must carry `session_id`; an older copy leaves the hook's
+   cross-session guard inert and a stale bridge nudging on every prompt (§3).
+   This step is easy to skip because nothing fails loudly when you do.
+5. Confirm `.gitignore` covers `.claude/state/` (§5) — the nudge hook writes
+   `hook-surface-log.jsonl` there on its first event even if you never wire the
+   statusline.
+6. Re-verify: nothing in your final `.claude/settings.json` wires `checkpoint`,
    `context-nudge`, `subagent-trail`, `validate-config`, `block-main-writes`,
    or `guard-secrets` (§2) — those come from the plugins now. Delete any
    project copy of `context-nudge.sh` in the same change: hooks merge, and a
