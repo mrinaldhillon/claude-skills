@@ -33,12 +33,13 @@ hooks load from `hooks/hooks.json`. The output style is registered via the `outp
 ### Deliberately NOT in core (ships in `scaffold` instead)
 
 The milestone/ADR machinery — the `/adr`/`/goal`/`/milestone`/`/scaffold:milestone-run`
-commands, the `block-main-writes`/`checkpoint`/`subagent-trail`/`validate-config` hooks, the `determinism-auditor`
-agent, and the `milestone-workflow`/`skill-maintenance` skills — ships in the
+commands, the `block-main-writes`/`checkpoint`/`context-nudge`/`resume-inject`/`subagent-trail`/`validate-config`
+hooks, the `determinism-auditor` agent, and the `milestone-workflow`/`skill-maintenance` skills — ships in the
 [`scaffold`](../scaffold) plugin, not here: it is coupled to per-project state (`docs/`,
 `.context/`) that a project-agnostic plugin can't assume. See [`scaffold/README.md`](../scaffold/README.md)
-for the current inventory rather than duplicating it here (and for why `context-nudge` ships in
-neither plugin — it's project-local, see `scaffold/references/project-setup/`).
+for the current inventory rather than duplicating it here (including `context-nudge`, which ships in
+`scaffold` as of 0.7.0 — ADR 0008; only its statusline *bridge writer* stays project-local, since no
+plugin can set the `statusLine` settings key).
 
 ## Invocation
 
