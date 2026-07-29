@@ -71,10 +71,20 @@ try_index_op() {
 # ATOMICALLY if any one pathspec matches nothing on disk (e.g. .context/ not
 # yet created mid-adoption) — staging NOTHING, error swallowed, and the run
 # would report "no changes" while real edits sit uncommitted.
+#
+# Also IGNORE-guarded. A project may legitimately gitignore one of these paths:
+# .context/RESUME.md is per-session, per-checkout state that never converges
+# between branches, so tracking it manufactures a conflict on every rebase, and
+# resume-inject.sh reads it from DISK rather than from git — untracking costs
+# the resume loop nothing. Without this guard, `git add` on an explicitly named
+# ignored path fails ("The following paths are ignored by one of your .gitignore
+# files"), which lands here as add_failed and prints the alarming and untrue
+# "durable edits NOT committed" on every single PreCompact. An ignored path is
+# not an error; it is a project saying "this one is mine to keep out of git."
 add_busy=0
 add_failed=0
 for p in "${paths[@]}"; do
-  if [ -e "$p" ]; then
+  if [ -e "$p" ] && ! git check-ignore -q -- "$p" 2>/dev/null; then
     rc=0
     try_index_op add -A -- "$p" || rc=$?
     if [ "$rc" -eq 75 ]; then
