@@ -159,7 +159,7 @@ if ! mkdir "$lock_dir" 2>/dev/null; then
   exit 5
 fi
 echo $$ > "$lock_dir/pid"
-trap 'rm -rf "$lock_dir"' EXIT INT TERM
+trap 'kill -TERM -"${pid:-}" 2>/dev/null; rm -rf "$lock_dir"' EXIT INT TERM
 
 # --- zero-cost flag probe: catch CLI flag drift at every start -----------------
 # No input → the CLI errors before any API call if the flags parse; an
@@ -178,6 +178,11 @@ run_id="${RUN_ID:-$(date +%Y%m%d-%H%M%S)}"
 run_dir=".claude/state/runs/$run_id"
 mkdir -p "$run_dir"
 timeout_s="${PHASE_TIMEOUT:-1800}"
+
+# Job control ON: each background job (the session, the watchdog) becomes its
+# own process-group leader, so timeout and cleanup can kill the WHOLE group —
+# killing only the pid leaks the session's children (subagents, MCP servers).
+set -m
 
 # shasum is the macOS spelling, sha256sum the GNU one — support both hosts.
 sha() { { shasum -a 256 "$1" 2>/dev/null || sha256sum "$1" 2>/dev/null; } | awk '{print $1}'; }
@@ -226,7 +231,8 @@ Then stop. Do not begin another chunk."
 
   iter_log="$run_dir/iter-$n.json"
   # Fresh session; output to a file (not command substitution) so the pure-bash
-  # watchdog below can babysit it — stock macOS has no timeout/gtimeout.
+  # watchdog below can babysit it and kill its process group — stock macOS has
+  # no timeout/gtimeout.
   CLAUDE_AUTOCOMPACT_PCT_OVERRIDE="${AUTOCOMPACT_PCT:-70}" \
     claude -p "$prompt" \
       --model "$model" \
@@ -235,10 +241,10 @@ Then stop. Do not begin another chunk."
       --max-budget-usd "$iter_budget" \
       </dev/null > "$iter_log" 2> "$iter_log.stderr" &
   pid=$!
-  ( sleep "$timeout_s" && kill "$pid" 2>/dev/null ) &
+  ( sleep "$timeout_s"; kill -TERM -"$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null ) &
   wd=$!
   wait "$pid"; rc=$?
-  kill "$wd" 2>/dev/null; wait "$wd" 2>/dev/null
+  kill -TERM -"$wd" 2>/dev/null || kill "$wd" 2>/dev/null; wait "$wd" 2>/dev/null
 
   out="$(cat "$iter_log" 2>/dev/null || true)"
   # Guarded parse — cost on BOTH paths (report-only; the CLI's --max-budget-usd is the cap).
