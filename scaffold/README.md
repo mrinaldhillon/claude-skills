@@ -51,13 +51,41 @@ project-scoped plugin.) Because it is project-scoped, the checkpoint/context hoo
 | agent   | `determinism-auditor`  | Advisory pre-scan for the five determinism/hot-path footguns; genericized (no `<PLACEHOLDER>`). Relevant only to projects with a replay/append-only invariant. Sonnet; terminal. |
 | hook    | `block-main-writes`    | PreToolUse(Bash): denies `git commit`/`merge`/`push` while the checkout is on `main` (trunk-based backstop). Project-scoped here so trunk-PR discipline is **opt-in per repo**, not global — moved out of `core` for exactly that reason. |
 | hook    | `checkpoint`           | PreCompact: commit durable state (`.context/`, `docs/decisions/`) on non-`main` branches; the milestone runner also calls it directly at iteration boundaries. Deliberately not wired to Stop — a per-turn trigger landed a commit every turn, interleaving automation commits with in-flight work. No-ops when the substrate is absent; activates once you create `.context/` (see `references/project-setup/`). Retries under index.lock contention from parallel subagents, then skips calmly (best-effort; the next checkpoint retries). |
-| hook    | `context-nudge`        | UserPromptSubmit + PostToolUse(*): inject a checkpoint nudge at 55% (watch) / 65% (land) context usage, read from the status-line bridge (`.claude/state/context-usage.json`). Session-identity guard: silent when the bridge belongs to another session sharing the checkout (the cross-session leak an mtime check cannot catch). Cheap no-op until the project wires the bridge (`references/project-setup/statusline.sh`). ADR 0008. |
-| hook    | `resume-inject`        | SessionStart(compact\|clear): re-inject `.context/RESUME.md` into the fresh window after an autocompact or `/clear` — the read-back complement to `checkpoint`'s write, closing the checkpoint→resume loop. No-op when `RESUME.md` is absent. |
+| hook    | `context-nudge`        | UserPromptSubmit + PostToolUse(*): inject a checkpoint nudge at 55% (watch) / 65% (land) context usage, read from the status-line bridge (`.claude/state/context-usage.json`). The land message names the same paths `checkpoint` commits — same env vars, same defaults (see Path configuration) — so it never tells a session to write what nothing preserves. Session-identity guard: silent when the bridge belongs to another session sharing the checkout (the cross-session leak an mtime check cannot catch). Cheap no-op until the project wires the bridge (`references/project-setup/statusline.sh`). ADR 0008. |
+| hook    | `resume-inject`        | SessionStart(compact\|clear): re-inject `.context/RESUME.md` into the fresh window after an autocompact or `/clear` — the read-back complement to `checkpoint`'s write, closing the checkpoint→resume loop. Reads from disk, never from git, so it works whether or not the project tracks the file. Assigns authority by kind: the file wins on the next action and durable pointers; after an autocompact the auto-summary may hold fresher mid-task detail. No-op when `RESUME.md` is absent. |
 | hook    | `subagent-trail`       | SubagentStop: append-only breadcrumb index of Agent-tool subagent transcripts for post-compaction recovery. |
 | hook    | `validate-config`      | PostToolUse(Write\|Edit): validate `.claude/` JSON + frontmatter on edit. |
 
 Skills/agents/commands auto-discover from their directories; hooks load from `hooks/hooks.json` via
 `${CLAUDE_PLUGIN_ROOT}`, and **merge** with your user/project hooks.
+
+### Path configuration (`settings.json` > `env`)
+
+`checkpoint` and `context-nudge` resolve the same two paths from the environment, so a project whose
+layout differs from the defaults configures it once and both agree. Set them in the project's
+`.claude/settings.json` under `env`:
+
+| Variable | Default | What it names |
+|---|---|---|
+| `CLAUDE_ADR_DIR` | `docs/decisions` | Where new ADRs land — committed by `checkpoint`, named in `context-nudge`'s land message. |
+| `CLAUDE_PROJECT_CONTEXT` | `.context/project-context.md` | The project-context document. Point it at `.context/RESUME.md` to collapse the two into one file; the nudge then omits the separate "update project-context" step rather than naming a file the project does not keep. |
+
+`.context/RESUME.md` is **not** configurable — `checkpoint` writes it and `resume-inject` reads it
+from a literal path, deliberately, so an override on one can never silently orphan the other.
+
+Two properties worth knowing. **A project may gitignore `.context/RESUME.md`**: per-checkout state
+never converges between branches, so tracking it manufactures a rebase conflict on every branch that
+outlives one session. `checkpoint` then skips it instead of failing, and the resume loop is
+unaffected because `resume-inject` reads from disk, never from git. And **`context-nudge` emits the
+project-context step only when that file exists and is distinct from the resume pointer** — a session
+told to update a missing file helpfully creates one, resurrecting a document the project removed on
+purpose.
+
+> **Testing note.** Because both hooks read these variables, the suites that exercise them
+> (`test-checkpoint`, `test-context-nudge`, `test-milestone-runner`) `unset` both at the top. A
+> developer running the suite from a checkout that wires them would otherwise test the *host's*
+> layout while CI — where they are unset — tests the defaults. That split hides real breaks behind a
+> green CI.
 
 > **Both skills are deliberately partial** — they carry only what `superpowers` doesn't. Plan
 > execution, skill authoring, and the evidence-before-done gate are its job; see the marketplace

@@ -5,7 +5,16 @@
 # checkpointed path is absent from the filesystem entirely. Also: reports an
 # honest busy-skip when index.lock is held for the whole run, and retries
 # through a transient lock to commit.
+#
+# Hermetic: checkpoint.sh resolves its pathspec from CLAUDE_ADR_DIR and
+# CLAUDE_PROJECT_CONTEXT. A host session exporting them — any project wiring
+# them in settings.json > env — retargets the hook at paths this sandbox does
+# not contain, so the suite fails against the HOST's layout instead of testing
+# the defaults. CI has them unset, so that failure reproduces only on a
+# developer machine: exactly the split that lets a real break hide behind a
+# green CI. Control them here so both agree.
 set -euo pipefail
+unset CLAUDE_ADR_DIR CLAUDE_PROJECT_CONTEXT
 here="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$here/.." && pwd)"
 script="$REPO/scaffold/hooks/checkpoint.sh"

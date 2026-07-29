@@ -34,6 +34,15 @@ We will keep agent-written project state in a top-level **`.context/`** director
 - `.context/project-context.md` and `.context/RESUME.md` — durable, committed by
   `checkpoint.sh` (pathspec updated; `docs/decisions/` remains in the pathspec — ADRs
   are documentation *of record* and stay in `docs/`).
+  **Amendment (2026-07-28):** "committed" is the default, not a requirement. A
+  project may gitignore either file, and `checkpoint.sh` then skips it rather
+  than failing — per-checkout state that never converges between branches
+  manufactures a rebase conflict on every branch outliving one session, so
+  tracking it is a per-project call. The *location* decision is unaffected, and
+  the resume loop is unaffected because `resume-inject.sh` has always read from
+  disk rather than from git. `.context/` therefore holds both tracked and
+  untracked members; the directory's own `README.md` is the contract for which
+  is which.
 - `.context/MILESTONE_DONE` and `.context/REPLAN.md` — the milestone runner's
   ephemeral sentinels, gitignored.
 - `.context/README.md` documents the directory's contract.
