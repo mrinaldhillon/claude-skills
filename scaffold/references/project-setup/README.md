@@ -80,7 +80,10 @@ convention doc is enough to bootstrap them.
 
 Add `.context/MILESTONE_DONE`, `.context/REPLAN.md`, and `.claude/state/` to
 your project's `.gitignore` — they're per-run/machine-local, per
-`context/README.md`.
+`context/README.md`. Add `.claude/worktrees/` too: `claude --worktree` creates
+its checkouts there, *inside* your repo, and nothing auto-ignores them — the
+first worktree puts `?? .claude/` in `git status`, and a `git add -A` from the
+main checkout would record the embedded worktree as a gitlink.
 
 Adopt the ADR baseline in [`decisions/`](decisions/): copy
 [`TEMPLATE.md`](decisions/TEMPLATE.md) plus the seed ADRs `0000`, `0001`,
@@ -159,9 +162,9 @@ would have shipped). Do this on a `chore/adopt-plugins` branch:
    0.7.0 the bridge must carry `session_id`; an older copy leaves the hook's
    cross-session guard inert and a stale bridge nudging on every prompt (§3).
    This step is easy to skip because nothing fails loudly when you do.
-5. Confirm `.gitignore` covers `.claude/state/` (§5) — the nudge hook writes
-   `hook-surface-log.jsonl` there on its first event even if you never wire the
-   statusline.
+5. Confirm `.gitignore` covers `.claude/state/` and `.claude/worktrees/` (§5) —
+   the nudge hook writes `hook-surface-log.jsonl` there on its first event even
+   if you never wire the statusline, and native worktrees land inside the repo.
 6. Re-verify: nothing in your final `.claude/settings.json` wires `checkpoint`,
    `context-nudge`, `subagent-trail`, `validate-config`, `block-main-writes`,
    or `guard-secrets` (§2) — those come from the plugins now. Delete any

@@ -21,7 +21,12 @@
 
 payload="$(cat 2>/dev/null || true)"
 
-proj="$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's@/@-@g')"
+# Claude Code names ~/.claude/projects/<dir> by replacing EVERY non-alphanumeric
+# byte with '-' — not just slashes (probe-verified 2026-07-28: '.', '_', '/').
+# Matters for native worktrees: claude --worktree sessions live at
+# <repo>/.claude/worktrees/<name>, so the path always contains dots; a
+# slash-only munge points at a dir that never exists and the trail silently dies.
+proj="$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | LC_ALL=C sed 's@[^A-Za-z0-9]@-@g')"
 memdir="$HOME/.claude/projects/$proj/memory"
 log="$memdir/.subagent-trail.log"
 [ -d "$memdir" ] || exit 0   # no project memory dir → nothing to checkpoint

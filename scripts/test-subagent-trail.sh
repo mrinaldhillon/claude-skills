@@ -15,7 +15,11 @@ trap 'rm -rf "$tmp"' EXIT
 export HOME="$tmp/home"
 export CLAUDE_PROJECT_DIR="$tmp/proj"
 mkdir -p "$CLAUDE_PROJECT_DIR" "$HOME"
-slug="$(printf '%s' "$CLAUDE_PROJECT_DIR" | sed 's@/@-@g')"
+# Claude Code names ~/.claude/projects/<dir> by replacing EVERY non-alphanumeric
+# byte of the project path with '-' (probe-verified 2026-07-28: '.', '_' and '/'
+# all munge). The suite must mirror that exactly — macOS mktemp paths contain a
+# dot, so a slash-only slug here would hide a munging mismatch in the hook.
+slug="$(printf '%s' "$CLAUDE_PROJECT_DIR" | LC_ALL=C sed 's@[^A-Za-z0-9]@-@g')"
 memdir="$HOME/.claude/projects/$slug/memory"
 log="$memdir/.subagent-trail.log"
 
@@ -43,6 +47,17 @@ for _ in $(seq 1 600); do printf 'x\ty\tz\n' >> "$log"; done
 invoke '{}'
 n="$(wc -l < "$log" | tr -d ' ')"
 [ "$n" -le 500 ] || { echo "FAIL: log unbounded ($n lines)"; fail=1; }
+
+# 5. Native-worktree project dir (claude --worktree puts the session at
+# <repo>/.claude/worktrees/<name>, so the path always contains a dot): the
+# breadcrumb must land in the dot-munged dir Claude Code actually reads.
+export CLAUDE_PROJECT_DIR="$tmp/repo/.claude/worktrees/wt"
+mkdir -p "$CLAUDE_PROJECT_DIR"
+wtslug="$(printf '%s' "$CLAUDE_PROJECT_DIR" | LC_ALL=C sed 's@[^A-Za-z0-9]@-@g')"
+wtlog="$HOME/.claude/projects/$wtslug/memory/.subagent-trail.log"
+mkdir -p "$HOME/.claude/projects/$wtslug/memory"
+invoke '{}'
+[ -f "$wtlog" ] || { echo "FAIL: no breadcrumb for native-worktree project dir (dot-munging mismatch)"; fail=1; }
 
 if [ "$fail" -eq 0 ]; then echo "ALL PASS"; fi
 exit "$fail"
