@@ -23,6 +23,12 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/.claude/state"
 export CLAUDE_PROJECT_DIR="$tmp"
+# Hermetic: the hook resolves the checkpoint paths from these two, so a host
+# session that exports them (any project wiring them in settings.json > env)
+# would silently retarget the land message and this suite would assert against
+# the HOST's layout, not the sandbox's. CI has them unset; a developer machine
+# may not. Control them here so both agree.
+unset CLAUDE_ADR_DIR CLAUDE_PROJECT_CONTEXT
 state="$tmp/.claude/state/context-usage.json"
 last="$tmp/.claude/state/.nudge-last"
 
@@ -120,6 +126,46 @@ echo '{"used_percentage": 58}' > "$state"
 assert_contains "$(prompt_sid sess-A)" "checkpoint threshold"
 echo '{"used_percentage": 58, "session_id": "sess-A"}' > "$state"
 assert_contains "$(prompt)" "checkpoint threshold"
+
+# --- land message resolves the checkpoint paths, and renumbers --------------
+# The land message must name exactly the files checkpoint.sh commits: same env
+# vars, same defaults. Naming a file the project does not keep tells the session
+# to write what nothing preserves — and a session told to update a missing file
+# helpfully creates one, resurrecting a document the project deliberately
+# removed. The RESUME line is unconditional; the project-context line is not.
+echo '{"used_percentage": 67}' > "$state"
+mkdir -p "$tmp/.context"
+
+# Default layout, project-context.md present: all four steps, default ADR dir.
+printf 'ctx\n' > "$tmp/.context/project-context.md"
+out="$(legacy)"
+assert_contains "$out" "1\. Update \.context/project-context\.md"
+assert_contains "$out" "2\. Append any new ADRs under docs/decisions/"
+assert_contains "$out" "3\. Write the single next action to \.context/RESUME\.md"
+assert_contains "$out" "4\. Commit those durable files"
+
+# Same layout, project-context.md ABSENT: the step is dropped and the remaining
+# ones renumber — a stale "4." with three steps is the bug this pins.
+rm -f "$tmp/.context/project-context.md"
+out="$(legacy)"
+assert_not_contains "$out" "project-context"
+assert_contains "$out" "1\. Append any new ADRs"
+assert_contains "$out" "3\. Commit those durable files"
+assert_not_contains "$out" "4\. Commit"
+
+# CLAUDE_ADR_DIR / CLAUDE_PROJECT_CONTEXT honored. Pointing the latter at the
+# resume pointer collapses the two into one file, so the update step must not
+# appear even though the target exists. Invoked directly rather than through
+# legacy(): a `VAR=x func` prefix on a shell FUNCTION persists after the call
+# under POSIX mode, so the env would leak into every later assertion.
+printf 'r\n' > "$tmp/.context/RESUME.md"
+out="$(CLAUDE_ADR_DIR=handled-docs/05-decisions \
+       CLAUDE_PROJECT_CONTEXT=.context/RESUME.md \
+       bash "$hook" </dev/null || printf 'HOOK_FAILED(rc=%s)' "$?")"
+assert_contains "$out" "1\. Append any new ADRs under handled-docs/05-decisions/"
+assert_not_contains "$out" "Update \.context/RESUME\.md"
+rm -f "$tmp/.context/RESUME.md"
+rmdir "$tmp/.context"
 
 # --- surface logger: written on first invocation, deduplicated thereafter -----
 # Every run above shares one (bundle, execpath) pair, so the log must hold

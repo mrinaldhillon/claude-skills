@@ -83,13 +83,39 @@ band=0
 [ "$pct_int" -ge "$WATCH_PCT" ] && band=1
 [ "$pct_int" -ge "$LAND_PCT" ] && band=2
 
+# Path resolution MUST match checkpoint.sh's — same env vars, same defaults.
+# That hook is what actually commits these files, so a nudge naming a different
+# set instructs the session to write what nothing preserves.
+adr_dir="${CLAUDE_ADR_DIR:-docs/decisions}"
+pc="${CLAUDE_PROJECT_CONTEXT:-.context/project-context.md}"
+resume=".context/RESUME.md"
+
+# The project-context step is emitted only when that file is a DISTINCT, present
+# document. A project may point CLAUDE_PROJECT_CONTEXT at the resume pointer
+# itself (collapsing the two into one file), or carry no project-context file at
+# all. In either case an "Update <path>" line names a file the project does not
+# keep — and a session told to update a missing file helpfully creates one,
+# resurrecting a document the project deliberately removed.
+n=0
+steps=""
+if [ "$pc" != "$resume" ] && [ -f "$dir/$pc" ]; then
+  n=$((n + 1))
+  steps="${steps}${n}. Update ${pc} — goal, files touched, decisions, and the exact next step.
+"
+fi
+n=$((n + 1))
+steps="${steps}${n}. Append any new ADRs under ${adr_dir}/.
+"
+n=$((n + 1))
+steps="${steps}${n}. Write the single next action to ${resume}.
+"
+n=$((n + 1))
+steps="${steps}${n}. Commit those durable files on your branch (never on main) — /clear fires no PreCompact, so no hook commits them for you."
+
 watch_msg="[CONTEXT NOTICE — ${pct_int}% used] Approaching the checkpoint threshold. Finish the current micro-task, then checkpoint before starting anything new."
 land_msg="[CONTEXT NOTICE — ${pct_int}% used]
 Reach a safe stopping point now. Before doing anything else:
-1. Update .context/project-context.md — goal, files touched, decisions, and the exact next step.
-2. Append any new ADRs under docs/decisions/.
-3. Write the single next action to .context/RESUME.md.
-4. Commit those durable files on your branch (never on main) — /clear fires no PreCompact, so no hook commits them for you.
+${steps}
 Then ask the user to run /clear and resume from those files. Do NOT start new work in this session."
 
 if [ "$event" != "PostToolUse" ]; then

@@ -11,7 +11,13 @@
 # bugs that shipped green in the parked plan (docs/meta/milestone-driver-plan.md,
 # appendix bugs 1-2). NOTE: the runner's zero-cost flag probe is invocation #1
 # in every live case; expected counts below include it.
+#
+# Hermetic: the runner's iteration prompt and checkpoint call resolve paths from
+# CLAUDE_ADR_DIR / CLAUDE_PROJECT_CONTEXT. A host session exporting them would
+# retarget those at paths this sandbox does not contain. CI has them unset, so
+# any resulting failure reproduces only on a developer machine.
 set -uo pipefail
+unset CLAUDE_ADR_DIR CLAUDE_PROJECT_CONTEXT
 here="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$here/.." && pwd)"
 RUNNER="$REPO/scaffold/scripts/milestone-runner.sh"
