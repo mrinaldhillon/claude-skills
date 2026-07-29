@@ -16,9 +16,13 @@ payload="$(cat)"
 file="$(printf '%s' "$payload" | jq -r '.tool_input.file_path // empty' 2>/dev/null)" || exit 0
 [ -n "$file" ] || exit 0
 
-# Only audit the steering layer.
+# Only audit the steering layer — anchored to THIS session's project root, not
+# a substring match. In a native-worktree session the checkout itself lives at
+# <repo>/.claude/worktrees/<name>, so */.claude/* matches every absolute path
+# in the project and strict-JSON kills legitimate files (JSONC tsconfig.json).
+proj="${CLAUDE_PROJECT_DIR:-$PWD}"
 case "$file" in
-  */.claude/*|.claude/*) ;;
+  "$proj"/.claude/*|.claude/*) ;;
   *) exit 0 ;;
 esac
 

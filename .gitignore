@@ -1,2 +1,6 @@
 .DS_Store
 *.log
+# Per-machine Claude Code state; .claude/worktrees/ is where claude --worktree
+# puts its checkouts (inside the repo — see project-setup README §5).
+.claude/state/
+.claude/worktrees/
