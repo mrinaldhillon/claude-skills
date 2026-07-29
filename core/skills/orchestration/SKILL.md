@@ -107,7 +107,8 @@ saves a worker's output; this one saves the orchestrator's own working context.
 
 Three delivery tiers, by session mode:
 
-- **Proactive nudge (interactive).** A threshold nudge — watch at ~55%, land by ~65% —
+- **Proactive nudge (interactive).** A threshold nudge — a watch band, then a land band a
+  few points above it (`scaffold` defaults to 40%/45%, configurable per project) —
   that tells the model to write the resume file and stop for a clean `/clear`. It needs a
   **status-line → file → hook bridge**: no hook event receives context-window usage on
   its stdin, so the status line (the only surface that sees usage) must persist it to a

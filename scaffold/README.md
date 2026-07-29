@@ -51,7 +51,7 @@ project-scoped plugin.) Because it is project-scoped, the checkpoint/context hoo
 | agent   | `determinism-auditor`  | Advisory pre-scan for the five determinism/hot-path footguns; genericized (no `<PLACEHOLDER>`). Relevant only to projects with a replay/append-only invariant. Sonnet; terminal. |
 | hook    | `block-main-writes`    | PreToolUse(Bash): denies `git commit`/`merge`/`push` while the checkout is on `main` (trunk-based backstop). Project-scoped here so trunk-PR discipline is **opt-in per repo**, not global — moved out of `core` for exactly that reason. |
 | hook    | `checkpoint`           | PreCompact: commit durable state (`.context/`, `docs/decisions/`) on non-`main` branches; the milestone runner also calls it directly at iteration boundaries. Deliberately not wired to Stop — a per-turn trigger landed a commit every turn, interleaving automation commits with in-flight work. No-ops when the substrate is absent; activates once you create `.context/` (see `references/project-setup/`). Retries under index.lock contention from parallel subagents, then skips calmly (best-effort; the next checkpoint retries). |
-| hook    | `context-nudge`        | UserPromptSubmit + PostToolUse(*): inject a checkpoint nudge at 55% (watch) / 65% (land) context usage, read from the status-line bridge (`.claude/state/context-usage.json`). The land message names the same paths `checkpoint` commits — same env vars, same defaults (see Path configuration) — so it never tells a session to write what nothing preserves. Session-identity guard: silent when the bridge belongs to another session sharing the checkout (the cross-session leak an mtime check cannot catch). Cheap no-op until the project wires the bridge (`references/project-setup/statusline.sh`). ADR 0008. |
+| hook    | `context-nudge`        | UserPromptSubmit + PostToolUse(*): inject a checkpoint nudge at 40% (watch) / 45% (land) context usage — the defaults; both are configurable, see Threshold configuration — read from the status-line bridge (`.claude/state/context-usage.json`). The land message names the same paths `checkpoint` commits — same env vars, same defaults (see Path configuration) — so it never tells a session to write what nothing preserves. Session-identity guard: silent when the bridge belongs to another session sharing the checkout (the cross-session leak an mtime check cannot catch). Cheap no-op until the project wires the bridge (`references/project-setup/statusline.sh`). ADR 0008. |
 | hook    | `resume-inject`        | SessionStart(compact\|clear): re-inject `.context/RESUME.md` into the fresh window after an autocompact or `/clear` — the read-back complement to `checkpoint`'s write, closing the checkpoint→resume loop. Reads from disk, never from git, so it works whether or not the project tracks the file. Assigns authority by kind: the file wins on the next action and durable pointers; after an autocompact the auto-summary may hold fresher mid-task detail. No-op when `RESUME.md` is absent. |
 | hook    | `subagent-trail`       | SubagentStop: append-only breadcrumb index of Agent-tool subagent transcripts for post-compaction recovery. |
 | hook    | `validate-config`      | PostToolUse(Write\|Edit): validate `.claude/` JSON + frontmatter on edit. |
@@ -85,7 +85,9 @@ purpose.
 > (`test-checkpoint`, `test-context-nudge`, `test-milestone-runner`) `unset` both at the top. A
 > developer running the suite from a checkout that wires them would otherwise test the *host's*
 > layout while CI — where they are unset — tests the defaults. That split hides real breaks behind a
-> green CI.
+> green CI. For the same reason `test-context-nudge` also unsets the two threshold variables below
+> **and** `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` — a suite run from inside a milestone-runner session
+> inherits that one and would silently exercise the clamp path.
 
 > **Both skills are deliberately partial** — they carry only what `superpowers` doesn't. Plan
 > execution, skill authoring, and the evidence-before-done gate are its job; see the marketplace
@@ -97,6 +99,45 @@ purpose.
 > It now lives as a reference example at
 > [`references/project-setup/docs/dev-workflow.md`](references/project-setup/docs/dev-workflow.md),
 > alongside the other substrate you adapt by hand. Same reasoning as the no-generator rule below.
+
+### Threshold configuration (`settings.json` > `env`)
+
+`context-nudge` fires at two percentages of the context window used. The defaults land early and
+leave wide headroom under auto-compact — the asymmetry is the point: landing early costs one cheap
+`/clear`, landing late costs the turn to a summary. A project on a 1M window, or one that checkpoints
+on a different beat, moves them:
+
+| Variable | Default | What it sets |
+|---|---|---|
+| `CLAUDE_NUDGE_WATCH_PCT` | `40` | Watch band — finish the current micro-task, then checkpoint. |
+| `CLAUDE_NUDGE_LAND_PCT` | `45` | Land band — checkpoint, commit, and ask the user to `/clear`. |
+
+Both are integers `1`–`99` and are validated **as a pair**: if either is out of range, non-numeric, or
+`watch > land`, *both* overrides are discarded and 40/45 apply, with one line on stderr saying so
+(visible under `claude --debug`; stdout can't carry it, since on `UserPromptSubmit` stdout *is* the
+injection channel and a warning there would reach Claude dressed as the notice). Half-applying a pair
+is the failure worth avoiding — a surviving override can invert `watch <= land`, which makes the
+watch band unreachable and fires the land message where the watch message belongs. Setting the two
+equal is legal and deliberate: it collapses them into a single land-now notice with no early warning.
+
+**The land threshold is clamped below auto-compact.** Auto-compact is the backstop, not the boundary
+(ADR 0004 §5): a nudge at or above the compaction trigger never precedes the summary, and the whole
+checkpoint-then-`/clear` loop is defeated. When `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` is visible in the
+hook's environment — set in `settings.json` > `env`, or exported around each spawned session by
+`scripts/milestone-runner.sh` (`AUTOCOMPACT_PCT`, default 70) — a land at or above it is clamped to
+one point below, the watch band follows it down if needed, and the clamp is reported on stderr. It
+clamps rather than rejects because the value that most often violates the invariant is a *default*
+the project never chose — a land it never set, against a trigger it did. The hook can only see that
+env var: the CLI's built-in trigger and `autoCompactEnabled` are invisible to it, so a project that
+relies on the built-in default is responsible for keeping its own land threshold under it.
+Best-effort by construction — the clamp assumes the statusline's `context_window.used_percentage` and
+the auto-compact trigger are percentages of the same window, which is the assumption ADR 0003 §2 and
+0004 §5 already make in placing the nudge bands under the trigger; the clamp inherits it rather than
+adding it.
+
+The timers (`COOLDOWN_S`, `STALE_S`) are deliberately **not** configurable — they tune injection
+noise and staleness tolerance, not checkpoint policy, and their values are load-bearing for the
+headless case (see the file's header comment).
 
 > **`context-nudge` ships here since 0.7.0** (ADR
 > [0008](references/decisions/0008-graduate-context-nudge-into-plugin.md), reversing the earlier

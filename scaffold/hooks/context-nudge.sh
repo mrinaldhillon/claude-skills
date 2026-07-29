@@ -25,12 +25,69 @@
 #
 # A hook cannot run /compact or /clear — this only injects guidance; the
 # checkpoint-and-clear happens in-conversation (ADR 0003/0004).
+#
+# Configurable: CLAUDE_NUDGE_WATCH_PCT / CLAUDE_NUDGE_LAND_PCT (defaults 40/45),
+# validated as a pair and clamped below the auto-compact trigger — see below.
 set -euo pipefail
 
-WATCH_PCT=55     # approaching — finish the current micro-task, then checkpoint
-LAND_PCT=65      # land now — checkpoint and clear (below the auto-compact trigger)
+# Thresholds, percent of the context window used (ADR 0003 §2, defaults lowered
+# to 40/45 in 0.8.0 — landing early costs a cheap /clear, landing late costs the
+# turn). A project whose window, model, or milestone rhythm differs overrides
+# them in .claude/settings.json > env. The timers below are NOT configurable —
+# they tune injection noise, not the checkpoint policy.
+WATCH_PCT="${CLAUDE_NUDGE_WATCH_PCT:-40}"  # approaching — finish the current micro-task, then checkpoint
+LAND_PCT="${CLAUDE_NUDGE_LAND_PCT:-45}"    # land now — checkpoint and clear (below the auto-compact trigger)
 COOLDOWN_S=300   # PostToolUse: min seconds between repeat nudges in the same band
 STALE_S=120      # PostToolUse: ignore a bridge file older than this
+
+# Validate the pair as a PAIR: one bad value discards BOTH overrides rather than
+# half-applying, because a surviving half can invert the ordering it was checked
+# against (a land below watch makes the watch band unreachable and fires the land
+# message first). Integers 1..99. `10#` strips leading zeros — `$((070 - 1))` is
+# 55, not 69, and that arithmetic runs on the clamp path below.
+nudge_warn=""
+valid_pct() {
+  case "${1:-}" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$((10#$1))" -ge 1 ] && [ "$((10#$1))" -le 99 ]
+}
+if ! valid_pct "$WATCH_PCT" || ! valid_pct "$LAND_PCT" ||
+   [ "$((10#$WATCH_PCT))" -gt "$((10#$LAND_PCT))" ]; then
+  nudge_warn="context-nudge: ignoring CLAUDE_NUDGE_WATCH_PCT='$WATCH_PCT' / CLAUDE_NUDGE_LAND_PCT='$LAND_PCT' (want integers 1-99, watch <= land) — using 40/45"
+  WATCH_PCT=40
+  LAND_PCT=45
+fi
+WATCH_PCT=$((10#$WATCH_PCT))
+LAND_PCT=$((10#$LAND_PCT))
+# Equal thresholds are legal and deliberate: it collapses the two bands into a
+# single land-now notice for a project that does not want the early warning.
+
+# Auto-compact is the backstop, not the boundary (ADR 0004 §5) — the land nudge
+# must fire BELOW the compaction trigger or a summary lands first and the whole
+# checkpoint-then-clear loop is defeated. When the session's trigger is visible
+# in the environment (settings.json > env, or the milestone runner's export at
+# scaffold/scripts/milestone-runner.sh), hold that invariant by clamping rather
+# than rejecting: a project that lowers auto-compact under the land threshold is
+# otherwise betrayed by a land it never set — the DEFAULT — against a trigger it
+# did. Only this env var is visible here; the CLI's built-in default and
+# `autoCompactEnabled` are not.
+ac="${CLAUDE_AUTOCOMPACT_PCT_OVERRIDE:-}"
+if valid_pct "$ac" && [ "$LAND_PCT" -ge "$((10#$ac))" ]; then
+  ac=$((10#$ac))
+  LAND_PCT=$((ac - 1))
+  [ "$LAND_PCT" -lt 1 ] && LAND_PCT=1
+  [ "$WATCH_PCT" -gt "$LAND_PCT" ] && WATCH_PCT="$LAND_PCT"
+  nudge_warn="${nudge_warn:+$nudge_warn
+}context-nudge: land threshold clamped to ${LAND_PCT}% — auto-compact fires at ${ac}% (CLAUDE_AUTOCOMPACT_PCT_OVERRIDE), and a nudge at or above it never precedes the summary"
+fi
+# stderr, never stdout: stdout IS the injection channel on UserPromptSubmit, so a
+# warning there would land in Claude's context as if it were the notice.
+#
+# Emitted HERE, before the no-bridge early exit below, on purpose: a rejected
+# override must be diagnosable in a repo that has not wired the statusline yet —
+# that is exactly when someone is asking why their thresholds do nothing. The
+# cost is one stderr line per event (visible only under `claude --debug`) while
+# the misconfiguration stands; a correct config is silent.
+[ -n "$nudge_warn" ] && printf '%s\n' "$nudge_warn" >&2
 
 dir="${CLAUDE_PROJECT_DIR:-.}"
 
@@ -71,7 +128,7 @@ if [ -n "$sid" ] && [ -n "$bridge_sid" ] && [ "$sid" != "$bridge_sid" ]; then
 fi
 
 pct="$(jq -r '.used_percentage // 0' "$state_file" 2>/dev/null || echo 0)"
-# Round, don't truncate: 64.999 must cross a 65 threshold at the same instant
+# Round, don't truncate: 44.999 must cross a 45 threshold at the same instant
 # the true usage does. Integer part, then round half-up on the first fractional
 # digit — pure shell, after the digit guard so garbage never reaches arithmetic.
 pct_int="${pct%.*}"

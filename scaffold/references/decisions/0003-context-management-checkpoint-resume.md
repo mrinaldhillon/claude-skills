@@ -45,6 +45,15 @@ Durable state lives in **files**; the session is disposable. The mechanism:
    *(Placement evolved by ADR 0008, 2026-07-22: the hook ships in the scaffold plugin's
    `hooks.json`, dual-mode per ADR 0004, with a session-identity guard; the statusline
    bridge stays project-local. The thresholds and mechanism stand.)*
+   *(Amended 2026-07-29, scaffold 0.8.0: the thresholds became **defaults**, overridable
+   per project via `CLAUDE_NUDGE_WATCH_PCT` / `CLAUDE_NUDGE_LAND_PCT`, and the defaults
+   moved from 55/65 to **40/45** — landing early costs one cheap `/clear`, landing late
+   costs the turn to a summary, so the asymmetry argues for more headroom than the
+   original pair left. What this decision fixes is the **ordering**, not the numbers:
+   watch ≤ land, land below the auto-compact trigger. The hook now enforces exactly that
+   — an invalid or inverted pair is discarded whole, and a land at or above a visible
+   `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` (ADR 0004 §5) is clamped under it, since a fixed
+   constant cannot survive a project that lowers auto-compact beneath it.)*
 3. **Checkpoint script** (`.claude/hooks/checkpoint.sh`, on `PreCompact` and `Stop`) commits
    the durable files — `docs/project-context.md`, `docs/decisions/`, `docs/RESUME.md`
    — but **only on non-main branches** (ADR 0002: PR-into-`main` is by discipline), committing

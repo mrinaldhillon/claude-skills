@@ -69,7 +69,8 @@ A milestone build is long, so its session accretes context. Keep per-call contex
 small — see `orchestration` › *Context hygiene* for the model (the cost that bites is
 context rot + window pressure + latency, not dollars; re-sent history is cache-read).
 
-- **Clear at each gate boundary** (or when the ~65% `context-nudge.sh` nudge fires):
+- **Clear at each gate boundary** (or when `context-nudge.sh`'s land nudge fires —
+  ~45% by default, per-project configurable):
   write `.context/RESUME.md` (single next action + branch + gate status), commit the
   durable files on the branch (`/clear` fires no `PreCompact`, so no hook commits them
   for you — ADR 0007), then `/clear`.

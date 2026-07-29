@@ -45,8 +45,13 @@ bridge. Ignoring `.claude/state/` is what keeps that out of `git status`.
 
 ## 3. Context-usage statusline (the nudge hook's bridge)
 
-The 55%/65% context nudges ship in the plugin (`scaffold/hooks/context-nudge.sh`,
-ADR 0008) — do not copy or wire the hook. What the plugin cannot ship is the
+The context nudges ship in the plugin (`scaffold/hooks/context-nudge.sh`, ADR
+0008) — do not copy or wire the hook. They fire at 40% (watch) and 45% (land) by
+default; a project that needs different bands sets `CLAUDE_NUDGE_WATCH_PCT` /
+`CLAUDE_NUDGE_LAND_PCT` in `.claude/settings.json` > `env` (see the plugin
+README's *Threshold configuration*). That is a hook-side setting only — the
+bridge schema is unchanged, so overriding the thresholds does **not** call for
+re-copying `statusline.sh`. What the plugin cannot ship is the
 bridge *writer*: copy [`statusline.sh`](statusline.sh) into your repo's
 `.claude/` — `settings.example.json` already wires it via the `statusLine` key,
 the one thing a plugin cannot set. It publishes
