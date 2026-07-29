@@ -148,6 +148,27 @@ with the advisor). Subagents fall into two classes, and neither calls `advisor`:
   that *needs* to consult is a prompt-construction bug — pack the critic's prompt
   completely instead.
 
+## Tool rosters are hypotheses — verify in a fresh session, degrade loudly
+
+A subagent's live tool roster does not reliably match its `tools:` frontmatter — in
+**either** direction. Measured in a consuming repo (three probes in one session,
+2026-07-26): an agent dispatched right after a frontmatter edit had none of its new
+tools and ran the pre-edit body; a later dispatch in the same session did have them;
+a third had a newly granted tool while missing two that predated the edit — and
+`advisor` appeared in its roster despite being in no `tools:` list anywhere (which is
+why the no-consult line lives in the agent *body*, per *Who consults whom*). The
+error string discriminates: "exists but is not enabled in this context" confirms a
+name is valid while unavailable; "no such tool" does not. Two design rules follow:
+
+- **An agent-definition edit is a hypothesis until a fresh session loads it.** Don't
+  certify a `tools:` or body change from inside the session that made it; probe from
+  a new session.
+- **Every agent body carries an absent-tool fallback:** attempt the call; if the tool
+  is absent, name it and the check that could not be performed, and flag any
+  weaker-method fallback as degraded — what the weaker method can miss. Without this
+  an agent silently substitutes (grep for a symbol query) and its report reads
+  complete when it is not.
+
 ## Verification = independent critics + deterministic gates
 
 Verification is never orchestrator-as-sole-judge. Use **independent reviewer agents

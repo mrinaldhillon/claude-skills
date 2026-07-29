@@ -37,10 +37,16 @@ Check at least:
   CLAUDE.md, a skill body, or another agent exists at that path. The "Shipped
   skills / agents / commands" lists in CLAUDE.md match what is on disk — nothing
   listed-but-absent or present-but-unlisted.
-- **MCP references resolve to the manifest.** Any MCP server named in a config,
-  skill, or agent (a tool the project tells Claude to call) must appear in the
-  project's `.mcp.json`; flag a referenced server the manifest doesn't declare,
-  and a declared server nothing references (a dead entry).
+- **MCP references resolve to the manifest — or to a documented ambient server.**
+  Any MCP server named in a config, skill, or agent (a tool the project tells
+  Claude to call) must either appear in the project's `.mcp.json` or be documented
+  in CLAUDE.md (or a doc it cites) as runtime-injected — provided by the surface
+  itself (an IDE-injected bridge), present in no config file by design. Flag a
+  referenced server that is neither declared nor documented, and a declared server
+  nothing references (a dead entry). Never flag a documented ambient server as
+  undeclared or fabricated merely for being absent from `.mcp.json` — surface-scoped
+  names are correct on their own surface, and a doc naming only one surface's name
+  is drift, not fabrication.
 - **Cross-links resolve.** Each `[[memory-slug]]` (in CLAUDE.md, `memory/`, or a
   skill body) points at a real `memory/<slug>.md` — none present today is fine, this
   is a forward check; each `docs/…`, `§`, or ADR citation points at a real
