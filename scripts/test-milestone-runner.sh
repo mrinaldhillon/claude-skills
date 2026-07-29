@@ -4,7 +4,8 @@
 # AUTOCOMPACT env), never --bare/--resume, permission-denial and is_error
 # failure paths, the REPLAN and MILESTONE_DONE sentinels with their gates,
 # iteration exhaustion, config validation, branch guard, lock, DRY_RUN
-# inertness, the trust boundary, and idempotent rerun after done.
+# inertness, the trust boundary, idempotent rerun after done, and the
+# watchdog killing the whole process group (not just $pid) on timeout.
 #
 # The stub logs ONE flattened line per invocation (prompt newlines → spaces),
 # so `wc -l` counts invocations and flags stay greppable — the two harness
@@ -264,6 +265,38 @@ d="$(mkrepo detached)"; mkconfig "$d"; runlog "$d"
 ( cd "$d" && git commit -q --allow-empty -m init && git checkout -q --detach \
   && CHECKPOINT_SH="$d/checkpoint-stub.sh" bash "$RUNNER" m.json ) >/dev/null 2>&1
 check "detached HEAD refused (4)" "4" "$?"
+
+# --- 26. watchdog kills the whole process group on timeout -----------------------------
+# PHASE_TIMEOUT=2 fires the watchdog fast. The payload backgrounds a long sleep
+# and blocks on `wait` so the claude stub survives until killed — invocation 2
+# is the first real iteration (invocation 1 is the zero-cost flag probe; a hang
+# there would deadlock the harness, hence `se 2`). Pre-fix, the watchdog kills
+# only $pid, leaking the sleep as an orphan sharing the job's process group.
+d="$(mkrepo wdgroup)"; mkconfig "$d"; runlog "$d"
+( cd "$d" && PHASE_TIMEOUT=2 STUB_SIDE_EFFECT="$(se 2 'sleep 300 & echo $! > child.pid; wait')" \
+  CHECKPOINT_SH="$d/checkpoint-stub.sh" bash "$RUNNER" m.json ) >/dev/null 2>&1
+rc=$?
+check "watchdog timeout still reported as claude exit 3" "3" "$rc"
+if [ -f "$d/child.pid" ]; then echo "PASS: watchdog case recorded the child pid"
+else echo "FAIL: watchdog case recorded the child pid (child.pid missing)"; fail=1; fi
+child="$(cat "$d/child.pid" 2>/dev/null)"
+if [ -z "$child" ]; then
+  echo "FAIL: watchdog kills the whole process group on timeout (no child pid recorded)"; fail=1
+else
+  still_alive=1
+  i=0
+  while [ "$i" -lt 25 ]; do
+    if ! kill -0 "$child" 2>/dev/null; then still_alive=0; break; fi
+    sleep 0.2
+    i=$((i + 1))
+  done
+  if [ "$still_alive" -eq 0 ]; then
+    echo "PASS: watchdog kills the whole process group on timeout"
+  else
+    echo "FAIL: watchdog kills the whole process group on timeout (child still alive)"; fail=1
+  fi
+fi
+kill "$(cat "$d/child.pid" 2>/dev/null)" 2>/dev/null || true
 
 [ "$fail" -eq 0 ] && echo "ALL PASS"
 exit "$fail"
