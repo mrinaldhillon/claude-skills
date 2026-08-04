@@ -106,17 +106,26 @@ printf '%s' "$stripped" | grep -Eq "$re" || exit 0
 segments="$(printf '%s\n' "$stripped" | awk '{ gsub(/[()]/, "\n@SUBSHELL@\n"); gsub(/[;&|]/, "\n"); print }')"
 
 cd_target=""
+heredoc=0
 deny_dir=""
 deny_branch=""
 while IFS= read -r seg; do
   if [ "$seg" = "@SUBSHELL@" ]; then cd_target=""; continue; fi
 
   # A segment that is exactly `cd <path>` sets the directory for the segments
-  # that follow it in this chain.
-  if printf '%s' "$seg" | grep -Eq '^[[:space:]]*cd[[:space:]]+[^[:space:]]+[[:space:]]*$'; then
+  # that follow it in this chain — but only until a heredoc opens. A heredoc
+  # BODY is data, not commands, and its lines are segments like any other: a
+  # body line reading `cd <some-repo-on-a-branch>` would otherwise be credited
+  # to a later real `git push` and wave it through on main. Everything before
+  # the `<<` is still trusted, which keeps the shape that actually occurs —
+  # `cd wt && git commit -F - <<EOF` — working. (The mirror case is safe on its
+  # own: a body line that looks like `git -C x push` can only ADD a segment to
+  # check, and the loop denies if ANY segment targets main.)
+  if [ "$heredoc" = 0 ] && printf '%s' "$seg" | grep -Eq '^[[:space:]]*cd[[:space:]]+[^[:space:]]+[[:space:]]*$'; then
     cd_target="$(printf '%s' "$seg" | sed -E 's/^[[:space:]]*cd[[:space:]]+//; s/[[:space:]]*$//')"
     continue
   fi
+  case "$seg" in *'<<'*) heredoc=1 ;; esac
 
   printf '%s' "$seg" | grep -Eq "$re" || continue
 

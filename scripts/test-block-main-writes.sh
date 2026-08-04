@@ -113,6 +113,37 @@ runc allow "$tmp" "git -C ../$(basename "$wt") commit -m x"
 runc allow "$tmp" "cd $wt && git -C . commit -m x"
 runc deny  "$wt"  "cd $tmp && git -C . push"
 
+# --- multi-line commands: the Bash tool emits them, and a newline IS a separator.
+# A newline is a real chain separator, so a `cd` on its own line carries.
+runc allow "$tmp" "cd $wt
+git push"
+# Backslash continuation leaves a bare `\` segment between the two; it must not
+# break the chain.
+runc allow "$tmp" "cd $wt && \\
+git push"
+# Both halves of a multi-line op on main still deny.
+runc deny "$tmp" "git add -A
+git commit -m x"
+runc deny "$tmp" "git commit -m \"line1
+line2\""
+# HEREDOC BODIES ARE DATA. A body line reading `cd <repo-on-a-branch>` must not
+# be credited to the real `git push` that follows — that was a live bypass.
+runc deny "$tmp" "cat <<EOF
+cd $wt
+EOF
+git push"
+# ...while a `cd` BEFORE the heredoc opens is still honoured, which is the shape
+# that actually occurs when committing from a worktree with a here-doc message.
+runc allow "$tmp" "cd $wt && git commit -F - <<EOF
+msg
+EOF"
+# The mirror case is safe without special handling: a body line that parses as a
+# git op only ADDS a segment, and the loop denies if ANY segment targets main.
+runc deny "$tmp" "cat <<EOF
+git -C $wt push
+EOF
+git push"
+
 # Documented parser limits, pinned so a future change has to face them: a `cd`
 # inside a quoted string is rejected by the token filter (the quote is what
 # rejects it), and separators are split without evaluating control flow, so a
