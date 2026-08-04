@@ -159,11 +159,48 @@ git push"
 runc allow "$tmp" "cd $wt && git commit -F - <<EOF
 msg
 EOF"
-# The mirror case is safe without special handling: a body line that parses as a
-# git op only ADDS a segment, and the loop denies if ANY segment targets main.
+# The mirror case: a body line that parses as a git op is inert, and the real
+# push on main still denies.
 runc deny "$tmp" "cat <<EOF
 git -C $wt push
 EOF
+git push"
+# ...and the delimiter must CLOSE the body. Treating "saw <<" as sticky blinds
+# the guard to the real `cd` after the body — which the shell does execute —
+# and was a confirmed bypass. All three delimiter spellings, session in the
+# worktree so only the post-body `cd` can produce the deny.
+runc deny "$wt" "cat <<EOF
+x
+EOF
+cd $tmp
+git push"
+runc deny "$wt" "cat <<-END
+x
+END
+cd $tmp
+git push"
+runc deny "$wt" "cat <<'EOF'
+x
+EOF
+cd $tmp
+git push"
+runc deny "$tmp" "cd $wt && cat <<EOF
+x
+EOF
+cd $tmp
+git push"
+# A body whose delimiter never arrives swallows the rest as data, real git op
+# included — so nothing matches and the `cd` candidates kept from the body are
+# the only evidence left. Must still deny.
+runc deny "$wt" "cat <<EOF
+cd $tmp
+git push"
+# The converse must keep working: after the body closes, a `cd` to a worktree
+# on a branch is honoured again.
+runc allow "$tmp" "cat <<EOF
+x
+EOF
+cd $wt
 git push"
 
 # Documented parser limits, pinned so a future change has to face them: a `cd`

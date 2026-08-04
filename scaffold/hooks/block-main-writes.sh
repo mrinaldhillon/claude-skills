@@ -55,6 +55,21 @@ resolve_dir() {
 # Empty for a non-repo or a detached HEAD — neither is `main`, so neither denies.
 branch_of() { git -C "$1" branch --show-current 2>/dev/null || true; }
 
+# Deny on any `cd` target that was seen inside a heredoc body whose delimiter
+# never closed (see the loop): the shell may genuinely be sitting in one of
+# them. Sets deny_dir/deny_branch on a hit. `hd_cd_dirs` is empty — so this is
+# a no-op — whenever every body closed normally, which is the usual case.
+check_hd_dirs() {
+  local hd
+  [ -n "$hd_cd_dirs" ] || return 0
+  while IFS= read -r hd; do
+    [ -n "$hd" ] || continue
+    if [ "$(branch_of "$hd")" = "main" ]; then deny_dir="$hd"; deny_branch="main"; return 0; fi
+  done <<HD
+$hd_cd_dirs
+HD
+}
+
 # Only branch-advancing git ops. `git` (bare or path-prefixed /usr/bin/git)
 # must sit at command position — line start, or after a shell separator ;&|( ,
 # an opening quote or backtick (catches sh -c "git push" and `git push`).
@@ -106,27 +121,50 @@ printf '%s' "$stripped" | grep -Eq "$re" || exit 0
 segments="$(printf '%s\n' "$stripped" | awk '{ gsub(/[()]/, "\n@SUBSHELL@\n"); gsub(/[;&|]/, "\n"); print }')"
 
 cd_target=""
-heredoc=0
+hd_delim=""
+hd_cd_dirs=""
 matched=0
 deny_dir=""
 deny_branch=""
 while IFS= read -r seg; do
   if [ "$seg" = "@SUBSHELL@" ]; then cd_target=""; continue; fi
 
-  # A segment that is exactly `cd <path>` sets the directory for the segments
-  # that follow it in this chain — but only until a heredoc opens. A heredoc
-  # BODY is data, not commands, and its lines are segments like any other: a
-  # body line reading `cd <some-repo-on-a-branch>` would otherwise be credited
-  # to a later real `git push` and wave it through on main. Everything before
-  # the `<<` is still trusted, which keeps the shape that actually occurs —
-  # `cd wt && git commit -F - <<EOF` — working. (The mirror case is safe on its
-  # own: a body line that looks like `git -C x push` can only ADD a segment to
-  # check, and the loop denies if ANY segment targets main.)
-  if [ "$heredoc" = 0 ] && printf '%s' "$seg" | grep -Eq '^[[:space:]]*cd[[:space:]]+[^[:space:]]+[[:space:]]*$'; then
-    cd_target="$(printf '%s' "$seg" | sed -E 's/^[[:space:]]*cd[[:space:]]+//; s/[[:space:]]*$//')"
+  trimmed="$(printf '%s' "$seg" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
+
+  # A heredoc BODY is data, not commands, but its lines are segments like any
+  # other, so a body line reading `cd <repo-on-a-branch>` must not be credited
+  # to a later real `git push`. Track the DELIMITER rather than merely "a `<<`
+  # was seen": a sticky flag also blinds the guard to the real `cd` that follows
+  # the body, which the shell very much executes — `<<EOF … EOF; cd <main>; git
+  # push` was a confirmed bypass for exactly that reason (probe, 2026-08-04).
+  # Body lines are skipped entirely, so one spelling `git -C x push` is inert.
+  if [ -n "$hd_delim" ]; then
+    if [ "$trimmed" = "$hd_delim" ]; then hd_delim=""; continue; fi
+    # Should the delimiter never arrive (a `;` inside the body split it, unusual
+    # quoting), the flag would stay set and a real post-body `cd` would be lost
+    # again. Keep every body `cd` as an extra candidate and judge it too — the
+    # shell may actually be there. Fail-closed, and inert once a body closes
+    # normally.
+    if printf '%s' "$trimmed" | grep -Eq '^cd[[:space:]]+[^[:space:]]+$'; then
+      d="$(resolve_dir "${trimmed#cd }" "$sess")"
+      if [ -n "$d" ]; then hd_cd_dirs="$hd_cd_dirs$d
+"; fi
+    fi
     continue
   fi
-  case "$seg" in *'<<'*) heredoc=1 ;; esac
+
+  # `<<` opens a body from the NEXT segment on; the rest of THIS one is still a
+  # real command, so `cd wt && git commit -F - <<EOF` keeps working.
+  case "$seg" in
+    *'<<'*) hd_delim="$(printf '%s' "$seg" | sed -nE 's/.*<<-?[[:space:]]*["'\'']?([A-Za-z_][A-Za-z0-9_]*).*/\1/p')" ;;
+  esac
+
+  # A segment that is exactly `cd <path>` sets the directory for the segments
+  # that follow it in this chain.
+  if printf '%s' "$trimmed" | grep -Eq '^cd[[:space:]]+[^[:space:]]+$'; then
+    cd_target="${trimmed#cd }"
+    continue
+  fi
 
   printf '%s' "$seg" | grep -Eq "$re" || continue
   matched=1
@@ -160,6 +198,9 @@ while IFS= read -r seg; do
 
   b="$(branch_of "$dir")"
   if [ "$b" = "main" ]; then deny_dir="$dir"; deny_branch="$b"; break; fi
+
+  check_hd_dirs
+  if [ -n "$deny_branch" ]; then break; fi
 done <<EOF
 $segments
 EOF
@@ -179,6 +220,9 @@ EOF
 if [ "$matched" = 0 ] && [ -z "$deny_branch" ]; then
   b="$(branch_of "$sess")"
   if [ "$b" = "main" ]; then deny_dir="$sess"; deny_branch="$b"; fi
+  # An unclosed heredoc body swallows the rest of the command as data, the real
+  # git op included, so nothing matched and the loop's own call never ran.
+  if [ -z "$deny_branch" ]; then check_hd_dirs; fi
 fi
 
 [ -n "$deny_branch" ] || exit 0
