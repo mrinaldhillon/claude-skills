@@ -41,9 +41,15 @@ decide() {
   else
     payload="$(jq -cn --arg c "$cmd" '{tool_input:{command:$c}}')"
   fi
-  out="$(printf '%s' "$payload" | CLAUDE_PROJECT_DIR="$tmp" "$hook" 2>/dev/null || true)"
+  # A nonzero exit becomes a loud marker rather than `|| true`: a hook that
+  # CRASHES emits no JSON, which is byte-identical to a clean allow, so
+  # swallowing the status would let every `expect=allow` case pass against a
+  # dead hook. Same convention as test-context-nudge.sh, and the reason is the
+  # same — a crashing hook must FAIL assertions, not silently satisfy them.
+  out="$(printf '%s' "$payload" | CLAUDE_PROJECT_DIR="$tmp" "$hook" 2>/dev/null || printf 'HOOK_FAILED(rc=%s)' "$?")"
   got=allow
   if printf '%s' "$out" | grep -q '"permissionDecision":"deny"'; then got=deny; fi
+  if printf '%s' "$out" | grep -q 'HOOK_FAILED'; then got=crash; fi
   if [ "$got" = "$expect" ]; then
     printf 'ok    [%-14s] %s\n' "$label" "$cmd"
   else
@@ -112,6 +118,22 @@ runc allow "$tmp" "git -C ../$(basename "$wt") commit -m x"
 # ...and inside a `cd` chain, against that cd — `.` there is the worktree.
 runc allow "$tmp" "cd $wt && git -C . commit -m x"
 runc deny  "$wt"  "cd $tmp && git -C . push"
+
+# A quote-unaware split is the hazard segmentation introduced: a `; | & ( )`
+# inside a PRE-subcommand argument cuts `git` from its subcommand, so no segment
+# matches and the op would vanish entirely. Each of these was a confirmed full
+# bypass before the no-segment-matched fallback landed. (A separator AFTER the
+# subcommand — inside a -m message — was always safe: `git commit` is matched
+# intact in the first segment. Both directions are pinned here.)
+runc deny "$tmp" 'git -c core.foo="a;b" commit -m x'
+runc deny "$tmp" 'git -c foo="a|b" push'
+runc deny "$tmp" 'git -C "/tmp/x;y" commit -m x'
+runc deny "$tmp" 'git -c a.b="x(y" push'
+runc deny "$tmp" 'git commit -m "a;b"'
+runc deny "$tmp" 'git commit -m "a|b && c"'
+# The refinement must still survive a quoted separator that does NOT split the
+# invocation: the worktree target is still honoured.
+runc allow "$tmp" "git -C $wt commit -m \"a;b\""
 
 # --- multi-line commands: the Bash tool emits them, and a newline IS a separator.
 # A newline is a real chain separator, so a `cd` on its own line carries.

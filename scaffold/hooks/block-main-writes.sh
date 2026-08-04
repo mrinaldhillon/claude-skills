@@ -107,6 +107,7 @@ segments="$(printf '%s\n' "$stripped" | awk '{ gsub(/[()]/, "\n@SUBSHELL@\n"); g
 
 cd_target=""
 heredoc=0
+matched=0
 deny_dir=""
 deny_branch=""
 while IFS= read -r seg; do
@@ -128,6 +129,7 @@ while IFS= read -r seg; do
   case "$seg" in *'<<'*) heredoc=1 ;; esac
 
   printf '%s' "$seg" | grep -Eq "$re" || continue
+  matched=1
 
   # Only `-C` BEFORE the subcommand is git's own (git rejects the unspaced
   # -C<path> form, so the spaced one is the only shape to handle). Truncating
@@ -161,6 +163,23 @@ while IFS= read -r seg; do
 done <<EOF
 $segments
 EOF
+
+# Segmentation may only ever REFINE which repo gets judged — never drop the
+# command. The whole-command gate above already proved a branch-advancing op is
+# in here, so if no segment matched, the split lost it and the session dir is
+# what to judge (exactly the pre-segmentation behavior). The split is
+# quote-unaware, and that is not hypothetical: a `; | & ( )` inside a
+# PRE-subcommand argument cuts `git` from its subcommand so neither half
+# matches — `git -c core.foo="a;b" commit -m x` was a full detection bypass
+# until this fallback existed (probe-confirmed 2026-08-03; a separator after
+# the subcommand, e.g. in a -m message, was always safe because `git commit`
+# is already matched intact in the first segment). This backstop also covers
+# the `@SUBSHELL@` marker having no nonce: attacker text equal to it can only
+# clear `cd_target`, which falls back here or to `$sess`.
+if [ "$matched" = 0 ] && [ -z "$deny_branch" ]; then
+  b="$(branch_of "$sess")"
+  if [ "$b" = "main" ]; then deny_dir="$sess"; deny_branch="$b"; fi
+fi
 
 [ -n "$deny_branch" ] || exit 0
 
