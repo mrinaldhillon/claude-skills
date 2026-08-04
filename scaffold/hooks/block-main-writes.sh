@@ -80,7 +80,13 @@ branch_of() { git -C "$1" branch --show-current 2>/dev/null || true; }
 # - `cd` attribution is per separator-chain, not a real shell: `cd wt && git
 #   push` is understood, `cd wt; cd ..; git push` is not (the last literal cd
 #   in the chain wins). Subshell parens reset it, which is right for
-#   `(cd wt && git push); git push` but coarse for nested forms.
+#   `(cd wt && git push); git push` but coarse for nested forms. Separators are
+#   not quote-aware either, so a `cd` inside a quoted string can be read as a
+#   real one — but only when the token survives resolve_dir, which rejects the
+#   quote that put it there. Control flow is likewise not evaluated: in
+#   `false && cd wt; git push` the shell never cds yet the guard credits `wt`,
+#   so a conditional cd can under-deny. Both are contrived shapes; a real shell
+#   parser is out of scope for a per-Bash-call hook.
 # - Known residual escapes: shell expansion (git${IFS}push), redirects before
 #   the word (2>&1 git push), backslash-newline token splits, and wrappers not
 #   in the list. Server-side branch protection (where configured) remains the

@@ -113,6 +113,13 @@ runc allow "$tmp" "git -C ../$(basename "$wt") commit -m x"
 runc allow "$tmp" "cd $wt && git -C . commit -m x"
 runc deny  "$wt"  "cd $tmp && git -C . push"
 
+# Documented parser limits, pinned so a future change has to face them: a `cd`
+# inside a quoted string is rejected by the token filter (the quote is what
+# rejects it), and separators are split without evaluating control flow, so a
+# short-circuited `cd` is still credited — the one shape that under-denies.
+runc deny  "$tmp" "echo \"a; cd $wt\" && git push"
+runc allow "$tmp" "false && cd $wt; git push"
+
 printf '\n'
 if [ "$fails" -eq 0 ]; then
   printf 'all block-main-writes tests passed\n'
