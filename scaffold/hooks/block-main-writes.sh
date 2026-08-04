@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# PreToolUse guard (Bash): refuse `git commit` / `merge` / `push` while the
-# checkout is on `main`. Trunk-based discipline (git-workflow skill; ADR 0001):
-# every change lands via a branch → PR. On this template branch protection is
-# BY DISCIPLINE (ADR 0002) — no server-side gate — so this local backstop is
-# the primary automated enforcement; a downstream project with real GitHub
-# protection gets it as defense-in-depth that fails fast, before a rejected
+# PreToolUse guard (Bash): refuse `git commit` / `merge` / `push` when the repo
+# the command actually TARGETS is on `main`. Trunk-based discipline (git-workflow
+# skill; ADR 0001): every change lands via a branch → PR. On this template branch
+# protection is BY DISCIPLINE (ADR 0002) — no server-side gate — so this local
+# backstop is the primary automated enforcement; a downstream project with real
+# GitHub protection gets it as defense-in-depth that fails fast, before a rejected
 # push round-trips. Deny is expressed as PreToolUse permissionDecision JSON on
 # stdout, exit 0. Ported from a downstream project's hardened version + tests.
 set -euo pipefail
@@ -17,6 +17,42 @@ command -v jq >/dev/null 2>&1 || { echo "block-main-writes: jq not found — fai
 input="$(cat)"
 cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // empty')"
 [ -n "$cmd" ] || exit 0
+
+# The directory the command runs in, absent an explicit `cd`/`-C`. Payload
+# `.cwd` first: probe-verified 2026-08-03 that a Bash PreToolUse payload carries
+# it, and that in a plain session it equals both CLAUDE_PROJECT_DIR and $PWD. It
+# is the better anchor because it names the directory the command is about to
+# run in, which for a native-worktree (`claude --worktree`) or started-in-a-
+# subdir session need not be the project root. CLAUDE_PROJECT_DIR stays as the
+# fallback for hosts that omit `.cwd`.
+proj="${CLAUDE_PROJECT_DIR:-$PWD}"
+sess="$(printf '%s' "$input" | jq -r '.cwd // empty')"
+if [ -z "$sess" ] || [ ! -d "$sess" ]; then sess="$proj"; fi
+
+# Resolve a LITERAL path token to an existing directory; print nothing if it
+# cannot be resolved without guessing. Nothing here is ever eval'd or expanded:
+# a token carrying shell metacharacters is unresolvable BY DESIGN, and the
+# caller then falls back to the session dir — the fail-closed direction.
+resolve_dir() {
+  local p="$1"
+  case "$p" in
+    \"*\") p="${p#\"}"; p="${p%\"}" ;;
+    \'*\') p="${p#\'}"; p="${p%\'}" ;;
+  esac
+  case "$p" in
+    ''|-|--) return 0 ;;
+    *'$'*|*'`'*|*'*'*|*'?'*|*'['*|*'~'*|*'"'*|*"'"*) return 0 ;;
+  esac
+  case "$p" in
+    /*) ;;
+    *)  p="$sess/$p" ;;
+  esac
+  [ -d "$p" ] || return 0
+  printf '%s' "$p"
+}
+
+# Empty for a non-repo or a detached HEAD — neither is `main`, so neither denies.
+branch_of() { git -C "$1" branch --show-current 2>/dev/null || true; }
 
 # Only branch-advancing git ops. `git` (bare or path-prefixed /usr/bin/git)
 # must sit at command position — line start, or after a shell separator ;&|( ,
@@ -36,10 +72,14 @@ cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // empty')"
 # still trips on the push; --continue stays blocked (it concludes the merge).
 #
 # LIMITATIONS (accepted — this is a fast local backstop, not a sandbox):
-# - Checks THIS checkout's branch, not the repo a `git -C <elsewhere>` command
-#   targets — while this project sits on main it also denies commits aimed at
-#   other repos. Park the checkout on a branch during cross-repo work, or
-#   override via /hooks.
+# - A target is honoured only when it is a literal path. `git -C "$WT" push`,
+#   a glob, or `~` is unresolvable, so the check falls back to the session dir
+#   — the same false positive this guard used to have everywhere. Pass the
+#   literal path, or override via /hooks.
+# - `cd` attribution is per separator-chain, not a real shell: `cd wt && git
+#   push` is understood, `cd wt; cd ..; git push` is not (the last literal cd
+#   in the chain wins). Subshell parens reset it, which is right for
+#   `(cd wt && git push); git push` but coarse for nested forms.
 # - Known residual escapes: shell expansion (git${IFS}push), redirects before
 #   the word (2>&1 git push), backslash-newline token splits, and wrappers not
 #   in the list. Server-side branch protection (where configured) remains the
@@ -48,10 +88,59 @@ stripped="$(printf '%s' "$cmd" | sed -E 's/merge[[:space:]]+--(abort|quit)([[:sp
 re='(^|[;&|(]|["'\''`])[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+|(env|command|nohup|time|xargs|sudo|timeout|nice|ionice|setsid|stdbuf|busybox|then|do|else|elif)([[:space:]]+[^[:space:]]+)?[[:space:]]+|-[^[:space:]]+[[:space:]]+)*([^[:space:]]*/)?git([[:space:]]+(-[^[:space:]]+([[:space:]]+[^[:space:]]+)?|[^[:space:]-][^[:space:]]*=[^[:space:]]*))*[[:space:]]+(commit|merge|push)([[:space:];&|)"'\''`]|$)'
 printf '%s' "$stripped" | grep -Eq "$re" || exit 0
 
-proj="${CLAUDE_PROJECT_DIR:-$PWD}"
-branch="$(git -C "$proj" branch --show-current 2>/dev/null || true)"
-[ "$branch" = "main" ] || exit 0
+# Split into segments so a `-C`/`cd` target is only ever attributed to the git
+# invocation that actually tripped the regex. Matching the whole command and
+# then hunting globally for a `-C` is unsound in the other direction: in
+# `git -C /elsewhere status && git commit`, the `-C` belongs to a subcommand
+# this guard does not police, and crediting it to the bare `git commit` would
+# wave through a commit on the session's own main checkout. `;&|` break a
+# chain; `()` additionally reset the inherited `cd`, since a subshell's cd does
+# not escape it. Segment start then plays the role of the regex's `^` anchor.
+segments="$(printf '%s\n' "$stripped" | awk '{ gsub(/[()]/, "\n@SUBSHELL@\n"); gsub(/[;&|]/, "\n"); print }')"
 
-jq -cn --arg b "$branch" \
-  '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:("Blocked: git commit/merge/push while on `" + $b + "`. Trunk-based workflow (git-workflow skill; ADR 0001/0002): branch first — git switch -c <fix|chore|docs|milestone>/… — then PR into main. Override via /hooks if this is intentional (e.g. an emergency admin action).")}}'
+cd_target=""
+deny_dir=""
+deny_branch=""
+while IFS= read -r seg; do
+  if [ "$seg" = "@SUBSHELL@" ]; then cd_target=""; continue; fi
+
+  # A segment that is exactly `cd <path>` sets the directory for the segments
+  # that follow it in this chain.
+  if printf '%s' "$seg" | grep -Eq '^[[:space:]]*cd[[:space:]]+[^[:space:]]+[[:space:]]*$'; then
+    cd_target="$(printf '%s' "$seg" | sed -E 's/^[[:space:]]*cd[[:space:]]+//; s/[[:space:]]*$//')"
+    continue
+  fi
+
+  printf '%s' "$seg" | grep -Eq "$re" || continue
+
+  # Only `-C` BEFORE the subcommand is git's own (git rejects the unspaced
+  # -C<path> form, so the spaced one is the only shape to handle). Truncating
+  # at the subcommand keeps a commit message that happens to contain " -C /x"
+  # from being read as a target. Two or more are cumulative in git and not
+  # worth emulating — leave them unresolved and fall back.
+  pre="$(printf '%s' "$seg" | sed -E 's/[[:space:]](commit|merge|push)([[:space:];&|)"'\''`]|$).*//')"
+  hits="$(printf '%s\n' "$pre" | { grep -oE '(^|[[:space:]])-C[[:space:]]+[^[:space:]]+' || true; })"
+  n="$(printf '%s' "$hits" | grep -c . || true)"
+
+  tok=""
+  if [ "$n" = "1" ]; then
+    tok="$(printf '%s' "$hits" | sed -E 's/.*-C[[:space:]]+//')"
+  elif [ "$n" = "0" ]; then
+    tok="$cd_target"
+  fi
+
+  dir=""
+  if [ -n "$tok" ]; then dir="$(resolve_dir "$tok")"; fi
+  if [ -z "$dir" ]; then dir="$sess"; fi
+
+  b="$(branch_of "$dir")"
+  if [ "$b" = "main" ]; then deny_dir="$dir"; deny_branch="$b"; break; fi
+done <<EOF
+$segments
+EOF
+
+[ -n "$deny_branch" ] || exit 0
+
+jq -cn --arg b "$deny_branch" --arg d "$deny_dir" \
+  '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:("Blocked: git commit/merge/push targeting `" + $d + "`, which is on `" + $b + "`. Trunk-based workflow (git-workflow skill; ADR 0001/0002): branch first — git switch -c <fix|chore|docs|milestone>/… — then PR into main. Override via /hooks if this is intentional (e.g. an emergency admin action).")}}'
 exit 0

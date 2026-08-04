@@ -70,10 +70,18 @@ every prompt. Re-copy `statusline.sh` in the same change that adopts 0.7.0.
 
 ## 4. Branch before your first commit
 
-`core`'s `block-main-writes` hook denies `git commit` on `main` — and
+`scaffold`'s `block-main-writes` hook denies `git commit` on `main` — and
 `git branch --show-current` reports `main` even on an unborn HEAD, so the very
 first commit in a fresh repo is denied. Run `git switch -c chore/setup` before
 you commit anything.
+
+Since scaffold 0.8.1 the hook resolves the repo the command *targets* (the
+invocation's literal `git -C <path>`, else the chain's `cd <path>`, else the
+session's `cwd`), so committing from a worktree parked on a branch no longer
+needs the anchor checkout moved off `main`. Two things still deny: a target it
+cannot resolve without expanding a variable or a glob (`git -C "$WT" push`
+falls back to the session dir — pass the literal path), and any op genuinely
+aimed at a checkout that is on `main`.
 
 ## 5. `.context/` and `docs/decisions/` conventions
 
