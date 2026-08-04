@@ -81,6 +81,15 @@ branch with the code it decides; standalone doc work never does.
 > first, and keep coupled writes single-threaded. Full caveat: the `orchestration`
 > skill › Parallelism, isolation, and merge discipline.
 
+> **Committing from a worktree: pass literal paths.** Where `scaffold`'s
+> `block-main-writes` guard is enabled, it resolves the repo your command
+> *targets* — the invocation's own `git -C <path>`, else that chain's
+> `cd <path>`, else the session's cwd. It never expands, so `git -C "$WT" push`
+> is unresolvable and falls back to the session dir, which denies whenever that
+> checkout is on `main`. Write the path out. (scaffold >= 0.8.1; older versions
+> checked only the session dir and denied every worktree commit while the anchor
+> checkout sat on `main`.)
+
 ## Delegate the mechanical parts to a Sonnet subagent
 
 Waiting on / watching CI, polling run status, opening PRs, merging on green,

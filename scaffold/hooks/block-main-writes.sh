@@ -29,12 +29,13 @@ proj="${CLAUDE_PROJECT_DIR:-$PWD}"
 sess="$(printf '%s' "$input" | jq -r '.cwd // empty')"
 if [ -z "$sess" ] || [ ! -d "$sess" ]; then sess="$proj"; fi
 
-# Resolve a LITERAL path token to an existing directory; print nothing if it
-# cannot be resolved without guessing. Nothing here is ever eval'd or expanded:
-# a token carrying shell metacharacters is unresolvable BY DESIGN, and the
-# caller then falls back to the session dir — the fail-closed direction.
+# Resolve a LITERAL path token ($1) against a base directory ($2) to an existing
+# directory; print nothing if it cannot be resolved without guessing. Nothing
+# here is ever eval'd or expanded: a token carrying shell metacharacters is
+# unresolvable BY DESIGN, and the caller then falls back to the session dir —
+# the fail-closed direction.
 resolve_dir() {
-  local p="$1"
+  local p="$1" base="$2"
   case "$p" in
     \"*\") p="${p#\"}"; p="${p%\"}" ;;
     \'*\') p="${p#\'}"; p="${p%\'}" ;;
@@ -45,7 +46,7 @@ resolve_dir() {
   esac
   case "$p" in
     /*) ;;
-    *)  p="$sess/$p" ;;
+    *)  p="$base/$p" ;;
   esac
   [ -d "$p" ] || return 0
   printf '%s' "$p"
@@ -122,15 +123,22 @@ while IFS= read -r seg; do
   hits="$(printf '%s\n' "$pre" | { grep -oE '(^|[[:space:]])-C[[:space:]]+[^[:space:]]+' || true; })"
   n="$(printf '%s' "$hits" | grep -c . || true)"
 
-  tok=""
-  if [ "$n" = "1" ]; then
-    tok="$(printf '%s' "$hits" | sed -E 's/.*-C[[:space:]]+//')"
-  elif [ "$n" = "0" ]; then
-    tok="$cd_target"
+  # The chain's `cd` is the base this invocation runs in, so a relative `-C`
+  # resolves against it (`cd wt && git -C sub push`), not against the session.
+  base="$sess"
+  if [ -n "$cd_target" ]; then
+    cdd="$(resolve_dir "$cd_target" "$sess")"
+    if [ -n "$cdd" ]; then base="$cdd"; fi
   fi
 
   dir=""
-  if [ -n "$tok" ]; then dir="$(resolve_dir "$tok")"; fi
+  if [ "$n" = "1" ]; then
+    tok="$(printf '%s' "$hits" | sed -E 's/.*-C[[:space:]]+//')"
+    dir="$(resolve_dir "$tok" "$base")"
+  elif [ "$n" = "0" ]; then
+    dir="$base"
+  fi
+  # No target, or one that could not be resolved literally → the session dir.
   if [ -z "$dir" ]; then dir="$sess"; fi
 
   b="$(branch_of "$dir")"

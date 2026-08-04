@@ -109,6 +109,9 @@ runc deny "$tmp" 'git -C "$WT" commit -m x'
 runc deny "$tmp" "git -C $tmp-does-not-exist push"
 # A relative target resolves against the session cwd, not the hook's own $PWD.
 runc allow "$tmp" "git -C ../$(basename "$wt") commit -m x"
+# ...and inside a `cd` chain, against that cd — `.` there is the worktree.
+runc allow "$tmp" "cd $wt && git -C . commit -m x"
+runc deny  "$wt"  "cd $tmp && git -C . push"
 
 printf '\n'
 if [ "$fails" -eq 0 ]; then
