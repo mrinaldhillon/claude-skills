@@ -64,7 +64,7 @@ check_hd_dirs() {
   [ -n "$hd_cd_dirs" ] || return 0
   while IFS= read -r hd; do
     [ -n "$hd" ] || continue
-    if [ "$(branch_of "$hd")" = "main" ]; then deny_dir="$hd"; deny_branch="main"; return 0; fi
+    if [ "$(branch_of "$hd")" = "main" ]; then deny_kind=main; deny_dir="$hd"; deny_branch="main"; return 0; fi
   done <<HD
 $hd_cd_dirs
 HD
@@ -89,19 +89,21 @@ HD
 #
 # LIMITATIONS (accepted — this is a fast local backstop, not a sandbox):
 # - A target is honoured only when it is a literal path. `git -C "$WT" push`,
-#   a glob, or `~` is unresolvable, so the check falls back to the session dir
-#   — the same false positive this guard used to have everywhere. Pass the
-#   literal path, or override via /hooks.
-# - `cd` attribution is per separator-chain, not a real shell: `cd wt && git
-#   push` is understood, `cd wt; cd ..; git push` is not (the last literal cd
-#   in the chain wins). Subshell parens reset it, which is right for
-#   `(cd wt && git push); git push` but coarse for nested forms. Separators are
-#   not quote-aware either, so a `cd` inside a quoted string can be read as a
-#   real one — but only when the token survives resolve_dir, which rejects the
-#   quote that put it there. Control flow is likewise not evaluated: in
-#   `false && cd wt; git push` the shell never cds yet the guard credits `wt`,
-#   so a conditional cd can under-deny. Both are contrived shapes; a real shell
-#   parser is out of scope for a per-Bash-call hook.
+#   a glob, `~`, `popd`, or a bare `cd` leaves the target undeterminable, and
+#   an undeterminable target is DENIED, not assumed. Assuming the session dir
+#   is only fail-closed when the session is the repo at risk; from a worktree
+#   session with the real target on main it is fail-OPEN, which is how `pushd
+#   /main && git push` used to slip past. Pass the literal path, or /hooks.
+# - `cd`/`pushd` attribution is per separator-chain, not a real shell:
+#   `cd wt && git push` is understood, and a later `cd` supersedes an earlier
+#   one, but nothing is evaluated. Subshell parens reset the base, which is
+#   right for `(cd wt && git push); git push` but coarse for nested forms.
+#   Separators are not quote-aware, so a `cd` inside a quoted string can be
+#   read as a real one — it then fails to resolve (the quote is part of the
+#   token) and lands on the deny above. Control flow is not evaluated either:
+#   in `false && cd wt; git push` the shell never cds yet the guard credits
+#   `wt`, so a conditional cd can under-deny. A real shell parser is out of
+#   scope for a hook that runs on every Bash call.
 # - Known residual escapes: shell expansion (git${IFS}push), redirects before
 #   the word (2>&1 git push), backslash-newline token splits, and wrappers not
 #   in the list. Server-side branch protection (where configured) remains the
@@ -120,14 +122,19 @@ printf '%s' "$stripped" | grep -Eq "$re" || exit 0
 # not escape it. Segment start then plays the role of the regex's `^` anchor.
 segments="$(printf '%s\n' "$stripped" | awk '{ gsub(/[()]/, "\n@SUBSHELL@\n"); gsub(/[;&|]/, "\n"); print }')"
 
-cd_target=""
+# `cd_base` is where the shell will be when the next segment runs; it goes EMPTY
+# with base_unknown=1 the moment that stops being computable. Undeterminable is
+# not the same as "assume the session dir" — see the deny below.
+cd_base="$sess"
+base_unknown=0
 hd_delim=""
 hd_cd_dirs=""
 matched=0
 deny_dir=""
 deny_branch=""
+deny_kind=""
 while IFS= read -r seg; do
-  if [ "$seg" = "@SUBSHELL@" ]; then cd_target=""; continue; fi
+  if [ "$seg" = "@SUBSHELL@" ]; then cd_base="$sess"; base_unknown=0; continue; fi
 
   trimmed="$(printf '%s' "$seg" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
 
@@ -154,17 +161,48 @@ while IFS= read -r seg; do
   fi
 
   # `<<` opens a body from the NEXT segment on; the rest of THIS one is still a
-  # real command, so `cd wt && git commit -F - <<EOF` keeps working.
+  # real command, so `cd wt && git commit -F - <<EOF` keeps working. Take the
+  # delimiter as ANY word and unwrap it here rather than matching an
+  # identifier-shaped one: `<<\EOF` and `<<9EOF` are ordinary heredoc spellings,
+  # and a capture that missed them left hd_delim empty, which made the whole
+  # BODY parse as live commands — the exact bypass delimiter tracking exists to
+  # stop (probe-confirmed 2026-08-04). A delimiter we still cannot read becomes
+  # a sentinel that never closes, so the body stays data and the unclosed-body
+  # backstop below carries the decision.
   case "$seg" in
-    *'<<'*) hd_delim="$(printf '%s' "$seg" | sed -nE 's/.*<<-?[[:space:]]*["'\'']?([A-Za-z_][A-Za-z0-9_]*).*/\1/p')" ;;
+    *'<<'*)
+      raw="$(printf '%s' "$seg" | sed -nE 's/.*<<-?[[:space:]]*([^[:space:]]+).*/\1/p')"
+      raw="${raw#\\}"
+      case "$raw" in
+        \'*\') raw="${raw#\'}"; raw="${raw%\'}" ;;
+        \"*\") raw="${raw#\"}"; raw="${raw%\"}" ;;
+      esac
+      hd_delim="${raw:-@NOCLOSE@}"
+      ;;
   esac
 
-  # A segment that is exactly `cd <path>` sets the directory for the segments
-  # that follow it in this chain.
-  if printf '%s' "$trimmed" | grep -Eq '^cd[[:space:]]+[^[:space:]]+$'; then
-    cd_target="${trimmed#cd }"
+  # Directory-changing builtins. `pushd <dir>` moves the shell exactly as `cd`
+  # does; `popd`, bare `cd`, and `cd -` move it somewhere this hook cannot
+  # compute. Treating an unreadable move as "still in the session dir" is how a
+  # guard leaks: from a worktree session, `pushd <main-checkout> && git push`
+  # then judged the worktree's branch and allowed a push to main.
+  if printf '%s' "$trimmed" | grep -Eq '^(cd|pushd)[[:space:]]+[^[:space:]]+$'; then
+    tok="$(printf '%s' "$trimmed" | sed -E 's/^(cd|pushd)[[:space:]]+//')"
+    d=""
+    if [ "$base_unknown" = 0 ]; then
+      d="$(resolve_dir "$tok" "$cd_base")"
+    else
+      # Base unknown: only an ABSOLUTE target re-anchors us. A relative one must
+      # not be joined to an empty base — "" + "/tmp" would resolve to a real
+      # directory that the shell was never in.
+      case "$tok" in /*) d="$(resolve_dir "$tok" /)" ;; esac
+    fi
+    if [ -n "$d" ]; then cd_base="$d"; base_unknown=0; else cd_base=""; base_unknown=1; fi
     continue
   fi
+  case "$trimmed" in
+    cd|popd|popd\ *|pushd|pushd\ *) cd_base=""; base_unknown=1; continue ;;
+  esac
 
   printf '%s' "$seg" | grep -Eq "$re" || continue
   matched=1
@@ -178,26 +216,30 @@ while IFS= read -r seg; do
   hits="$(printf '%s\n' "$pre" | { grep -oE '(^|[[:space:]])-C[[:space:]]+[^[:space:]]+' || true; })"
   n="$(printf '%s' "$hits" | grep -c . || true)"
 
-  # The chain's `cd` is the base this invocation runs in, so a relative `-C`
-  # resolves against it (`cd wt && git -C sub push`), not against the session.
-  base="$sess"
-  if [ -n "$cd_target" ]; then
-    cdd="$(resolve_dir "$cd_target" "$sess")"
-    if [ -n "$cdd" ]; then base="$cdd"; fi
-  fi
-
+  # A relative `-C` resolves against the chain's cd (`cd wt && git -C sub push`),
+  # not against the session.
   dir=""
   if [ "$n" = "1" ]; then
     tok="$(printf '%s' "$hits" | sed -E 's/.*-C[[:space:]]+//')"
-    dir="$(resolve_dir "$tok" "$base")"
+    if [ "$base_unknown" = 0 ]; then
+      dir="$(resolve_dir "$tok" "$cd_base")"
+    else
+      case "$tok" in /*) dir="$(resolve_dir "$tok" /)" ;; esac
+    fi
   elif [ "$n" = "0" ]; then
-    dir="$base"
+    if [ "$base_unknown" = 0 ]; then dir="$cd_base"; fi
   fi
-  # No target, or one that could not be resolved literally → the session dir.
-  if [ -z "$dir" ]; then dir="$sess"; fi
+
+  # Target undeterminable → DENY. Falling back to the session dir here is only
+  # fail-closed when the session IS the repo at risk; with the session on a
+  # branch and the real target on main it is fail-OPEN, which is how `cd  /main`
+  # (two spaces), `pushd /main`, and `git -C "$VAR" push` all slipped through.
+  # An unknown target is the one case where this guard has nothing to judge, so
+  # it refuses rather than guesses. Pass a literal path, or override via /hooks.
+  if [ -z "$dir" ]; then deny_kind=unknown; deny_branch="?"; break; fi
 
   b="$(branch_of "$dir")"
-  if [ "$b" = "main" ]; then deny_dir="$dir"; deny_branch="$b"; break; fi
+  if [ "$b" = "main" ]; then deny_kind=main; deny_dir="$dir"; deny_branch="$b"; break; fi
 
   check_hd_dirs
   if [ -n "$deny_branch" ]; then break; fi
@@ -216,10 +258,10 @@ EOF
 # the subcommand, e.g. in a -m message, was always safe because `git commit`
 # is already matched intact in the first segment). This backstop also covers
 # the `@SUBSHELL@` marker having no nonce: attacker text equal to it can only
-# clear `cd_target`, which falls back here or to `$sess`.
+# reset the base, which falls back here or to `$sess`.
 if [ "$matched" = 0 ] && [ -z "$deny_branch" ]; then
   b="$(branch_of "$sess")"
-  if [ "$b" = "main" ]; then deny_dir="$sess"; deny_branch="$b"; fi
+  if [ "$b" = "main" ]; then deny_kind=main; deny_dir="$sess"; deny_branch="$b"; fi
   # An unclosed heredoc body swallows the rest of the command as data, the real
   # git op included, so nothing matched and the loop's own call never ran.
   if [ -z "$deny_branch" ]; then check_hd_dirs; fi
@@ -227,6 +269,14 @@ fi
 
 [ -n "$deny_branch" ] || exit 0
 
-jq -cn --arg b "$deny_branch" --arg d "$deny_dir" \
-  '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:("Blocked: git commit/merge/push targeting `" + $d + "`, which is on `" + $b + "`. Trunk-based workflow (git-workflow skill; ADR 0001/0002): branch first — git switch -c <fix|chore|docs|milestone>/… — then PR into main. Override via /hooks if this is intentional (e.g. an emergency admin action).")}}'
+tail='Trunk-based workflow (git-workflow skill; ADR 0001/0002): branch first — git switch -c <fix|chore|docs|milestone>/… — then PR into main. Override via /hooks if this is intentional (e.g. an emergency admin action).'
+if [ "$deny_kind" = unknown ]; then
+  # shellcheck disable=SC2016  # the backticks are markdown in the user-facing
+  # message, not command substitution — single quotes are what keeps them so.
+  head='Blocked: git commit/merge/push whose target directory cannot be determined. A `cd`/`pushd`/`popd` or a `-C` in this command is not a literal path (it needs a variable, glob or `~` expanded), so this guard cannot tell which repo it lands in and will not guess. Pass the literal path. '
+else
+  head="Blocked: git commit/merge/push targeting \`$deny_dir\`, which is on \`$deny_branch\`. "
+fi
+jq -cn --arg r "$head$tail" \
+  '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
 exit 0

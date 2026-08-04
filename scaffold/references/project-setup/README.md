@@ -76,12 +76,14 @@ first commit in a fresh repo is denied. Run `git switch -c chore/setup` before
 you commit anything.
 
 Since scaffold 0.8.1 the hook resolves the repo the command *targets* (the
-invocation's literal `git -C <path>`, else the chain's `cd <path>`, else the
-session's `cwd`), so committing from a worktree parked on a branch no longer
-needs the anchor checkout moved off `main`. Two things still deny: a target it
-cannot resolve without expanding a variable or a glob (`git -C "$WT" push`
-falls back to the session dir — pass the literal path), and any op genuinely
-aimed at a checkout that is on `main`.
+invocation's literal `git -C <path>`, else the chain's `cd`/`pushd <path>`, else
+the session's `cwd`), so committing from a worktree parked on a branch no longer
+needs the anchor checkout moved off `main`. Two things still deny: any op
+genuinely aimed at a checkout on `main`, and a target the hook cannot determine
+literally — `git -C "$WT" push`, a glob, `~`, `popd`, or a bare `cd`. The second
+is denied outright rather than assumed to be the session dir, because assuming
+is fail-open in the case that matters: session on a branch, real target on
+`main`. Pass literal paths.
 
 ## 5. `.context/` and `docs/decisions/` conventions
 

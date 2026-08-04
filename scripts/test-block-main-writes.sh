@@ -203,6 +203,32 @@ EOF
 cd $wt
 git push"
 
+# --- an UNDETERMINABLE target denies; it is not assumed to be the session dir.
+# Assuming the session is only fail-closed when the session is the repo at risk.
+# Every case here runs from the WORKTREE (off main) with the real target on
+# main, which is the direction where assuming the session dir is fail-OPEN — all
+# four were confirmed bypasses.
+runc deny "$wt" "pushd $tmp && git push"
+runc deny "$wt" "popd && git push"
+runc deny "$wt" "cd  $tmp && git push"
+# shellcheck disable=SC2016  # `$WT` must reach the hook UNEXPANDED.
+runc deny "$wt" 'git -C "$WT" push'
+# `pushd` moves the shell exactly like `cd`, so it must also be honoured when it
+# points somewhere legitimate — the fix is to READ it, not to blanket-deny.
+runc allow "$tmp" "pushd $wt && git push"
+
+# The heredoc delimiter is any word, not just an identifier. `<<\EOF` and
+# `<<9EOF` are ordinary spellings; a capture that missed them left the body
+# parsing as live commands, so a forged body `cd` was credited to the real push.
+runc deny "$tmp" "cat <<\\EOF
+cd $wt
+EOF
+git push"
+runc deny "$tmp" "cat <<9EOF
+cd $wt
+9EOF
+git push"
+
 # Documented parser limits, pinned so a future change has to face them: a `cd`
 # inside a quoted string is rejected by the token filter (the quote is what
 # rejects it), and separators are split without evaluating control flow, so a
