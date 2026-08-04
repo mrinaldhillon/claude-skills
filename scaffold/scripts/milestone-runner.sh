@@ -151,7 +151,13 @@ if [ "$permission_profile" = "bypass" ] \
   exit 2
 fi
 
-# --- lock: one run per repo (mkdir is atomic; no flock on stock macOS) ---------
+# --- lock: one run per CHECKOUT (mkdir is atomic; no flock on stock macOS) -----
+# Per checkout, not per repo: `.claude/state/` is untracked and worktree-local,
+# and `$repo` came from `git rev-parse --show-toplevel`, which reports a linked
+# or native (`claude --worktree`) worktree as its own toplevel. So two worktrees
+# of one repo can run concurrently — which is the point of a worktree; each has
+# its own working tree and its own branch. Don't "fix" this by anchoring the
+# lock at the shared `--git-common-dir`: that would serialize independent runs.
 lock_dir=".claude/state/milestone.lock"
 mkdir -p .claude/state
 if ! mkdir "$lock_dir" 2>/dev/null; then

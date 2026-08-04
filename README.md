@@ -9,7 +9,7 @@ keeping a personal steering layer in sync (per code.claude.com/docs: plugins, pl
 | Plugin | Scope | Contents |
 |--------|-------|----------|
 | [`core`](./core) | user-level (all repos) | 4 skills (`cost-aware-delegation`, `orchestration`, `git-workflow`, `deep-research-tiered`), 5 agents (`advisor-plus`, `code-reviewer`, `search`, `doc-sync`, `config-auditor`), the `distinguished-engineer` output style, 1 guard hook (`guard-secrets`) |
-| [`scaffold`](./scaffold) | per-repo (opt-in) | 2 skills (`milestone-workflow`, `skill-maintenance`), 4 commands (`/adr`, `/goal`, `/milestone`, `/scaffold:milestone-run`), the `determinism-auditor` agent, 4 hooks (`block-main-writes`, `checkpoint`, `subagent-trail`, `validate-config`), and `references/` for by-hand project setup. **Requires `core`.** |
+| [`scaffold`](./scaffold) | per-repo (opt-in) | 2 skills (`milestone-workflow`, `skill-maintenance`), 4 commands (`/adr`, `/goal`, `/milestone`, `/scaffold:milestone-run`), the `determinism-auditor` agent, 6 hooks (`block-main-writes`, `checkpoint`, `context-nudge`, `resume-inject`, `subagent-trail`, `validate-config`), and `references/` for by-hand project setup. **Requires `core`.** |
 
 `core` is broadly/globally enabled and project-agnostic. `scaffold` is the project-enabled half: turn it on
 per-repo, and it assumes a concrete `docs/` + `.context/` layout (hand-set up per

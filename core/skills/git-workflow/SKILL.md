@@ -81,6 +81,25 @@ branch with the code it decides; standalone doc work never does.
 > first, and keep coupled writes single-threaded. Full caveat: the `orchestration`
 > skill › Parallelism, isolation, and merge discipline.
 
+> **Committing from a worktree: pass literal paths.** Where `scaffold`'s
+> `block-main-writes` guard is enabled, it works out which repo your command
+> targets. It does **not** parse shell — it reads two conventions, so write
+> them:
+>
+> 1. **Put the `cd` first**, if you need one: `cd <literal path> && git push`.
+>    One opening `cd` is understood. A `cd` later in the chain, a second one, a
+>    `pushd`/`popd`, or one inside a heredoc body is not.
+> 2. **Pass a literal path to `git -C`** — `git -C /abs/path push`. It is
+>    honoured when the command holds exactly one `git` word, so it is not
+>    mistaken for a flag belonging to some other subcommand.
+>
+> Nothing is ever expanded, so `git -C "$WT" push` or a glob leaves the target
+> undeterminable — and an undeterminable target is **denied**, not assumed to be
+> the session dir. Assuming would be fail-open in exactly the case that matters:
+> you on a branch, the real target on `main`. (scaffold >= 0.8.1; older versions
+> checked only the session dir and denied every worktree commit while the anchor
+> checkout sat on `main`.)
+
 ## Delegate the mechanical parts to a Sonnet subagent
 
 Waiting on / watching CI, polling run status, opening PRs, merging on green,

@@ -70,10 +70,27 @@ every prompt. Re-copy `statusline.sh` in the same change that adopts 0.7.0.
 
 ## 4. Branch before your first commit
 
-`core`'s `block-main-writes` hook denies `git commit` on `main` — and
+`scaffold`'s `block-main-writes` hook denies `git commit` on `main` — and
 `git branch --show-current` reports `main` even on an unborn HEAD, so the very
 first commit in a fresh repo is denied. Run `git switch -c chore/setup` before
 you commit anything.
+
+Since scaffold 0.8.1 the hook works out which repo the command *targets*, so
+committing from a worktree parked on a branch no longer needs the anchor
+checkout moved off `main`. It does not parse shell; it reads two conventions:
+
+1. One **opening** `cd <literal path>` (`cd /path/wt && git push`). A `cd` later
+   in the chain, a second one, a `pushd`/`popd`, or one inside a heredoc body is
+   not tracked.
+2. A **literal** `git -C <path>`, honoured when the command holds exactly one
+   `git` word.
+
+Otherwise it uses the session's `cwd`. Anything it cannot determine literally --
+`git -C "$WT" push`, a glob, `~`, a non-opening `cd` -- is **denied**, not
+assumed to be the session dir: assuming is fail-open in the case that matters,
+session on a branch with the real target on `main`. The deny message says which
+convention to write. Over-detection is deliberate; its mistakes cost a spurious
+deny, never a missed one.
 
 ## 5. `.context/` and `docs/decisions/` conventions
 

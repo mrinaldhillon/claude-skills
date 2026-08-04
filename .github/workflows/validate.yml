@@ -5,7 +5,9 @@ on:
   pull_request:
 
 jobs:
-  validate:
+  # Lint once. shellcheck is a static analyser — its verdict does not vary by
+  # runner OS, so paying for it twice buys nothing.
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,6 +31,30 @@ jobs:
 
       - name: shellcheck
         run: shellcheck scripts/*.sh core/hooks/*.sh scaffold/hooks/*.sh scaffold/scripts/*.sh scaffold/references/project-setup/*.sh
+
+  # Run the suites on BOTH toolchains. These hooks ship to developer machines,
+  # which on macOS means BSD sed/grep/awk/stat/date and bash 3.2 — a different
+  # runtime from Ubuntu's GNU coreutils and bash 5, and the source of real past
+  # bugs (the GNU `stat -f` stdout leak pinned in test-context-nudge.sh, and
+  # BSD sed's lack of `\n` in a replacement, which is why the segmenter in
+  # block-main-writes.sh uses awk). Ubuntu-only CI cannot see either. Note a
+  # macOS dev box with Homebrew coreutils/ugnu tools ahead of /usr/bin is NOT a
+  # BSD check — it silently tests GNU — so this runner is the only honest one.
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: toolchain provenance
+        run: |
+          printf 'bash: %s\n' "$BASH_VERSION"
+          printf 'grep: %s\n' "$(grep --version 2>&1 | head -1)"
+          printf 'sed:  %s\n' "$(sed --version 2>&1 | head -1)"
+          printf 'jq:   %s\n' "$(jq --version 2>&1)"
 
       - name: validate marketplace manifests and components
         run: ./scripts/validate.sh

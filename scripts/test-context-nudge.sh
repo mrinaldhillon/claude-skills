@@ -260,6 +260,29 @@ assert_contains "$(nudge_err "${env_070[@]}")" "clamped to 69%"
 echo '{"used_percentage": 42}' > "$state"
 assert_contains "$(nudge CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=garbage)" "checkpoint threshold"
 
+# --- project-dir fallback: payload `.cwd` when CLAUDE_PROJECT_DIR is unset -----
+# The bridge WRITER (references/project-setup/statusline.sh) falls back to the
+# payload; before scaffold 0.8.1 this reader fell back to bare `.` instead, so on
+# a host that omits CLAUDE_PROJECT_DIR the two used different .claude/state dirs
+# and the nudge silently read a bridge that was never written. Every run below
+# executes from a neutral empty cwd so `.` cannot coincidentally resolve to a
+# directory holding a bridge — the host repo's own .claude/state is a real one.
+alt="$tmp/alt"; neutral="$tmp/neutral"
+mkdir -p "$alt/.claude/state" "$neutral"
+echo '{"used_percentage": 47}' > "$alt/.claude/state/context-usage.json"
+echo '{"used_percentage": 30}' > "$state"   # poisoned: a reader that ignores
+                                            # `.cwd` lands here and stays silent
+cwd_run() { (cd "$neutral" && printf '{"hook_event_name":"UserPromptSubmit","cwd":"%s"}' "$1" \
+  | env "${@:2}" bash "$hook" || printf 'HOOK_FAILED(rc=%s)' "$?"); }
+
+assert_contains "$(cwd_run "$alt" -u CLAUDE_PROJECT_DIR)" "RESUME.md"
+# No CLAUDE_PROJECT_DIR and no usable `.cwd` → `.`, i.e. the neutral dir: silent,
+# never a crash.
+assert_empty "$(cwd_run "$tmp/nonexistent" -u CLAUDE_PROJECT_DIR)"
+# CLAUDE_PROJECT_DIR still WINS over the payload (writer/reader path contract):
+# it points at the poisoned 30% bridge, so the 47% in `.cwd` must not nudge.
+assert_empty "$(cwd_run "$alt" "CLAUDE_PROJECT_DIR=$tmp")"
+
 # --- surface logger: written on first invocation, deduplicated thereafter -----
 # Every run above shares one (bundle, execpath) pair, so the log must hold
 # exactly one line no matter how many hook invocations this suite made.

@@ -89,7 +89,28 @@ fi
 # the misconfiguration stands; a correct config is silent.
 [ -n "$nudge_warn" ] && printf '%s\n' "$nudge_warn" >&2
 
-dir="${CLAUDE_PROJECT_DIR:-.}"
+# Hook payload arrives on stdin; the -t guard keeps a manual TTY run from
+# hanging. Read BEFORE resolving `dir` — the payload carries its fallback.
+input=""
+[ -t 0 ] || input="$(cat || true)"
+
+# Project dir: CLAUDE_PROJECT_DIR, then the payload's `.cwd`, then `.`. The
+# payload step is what makes the parity the bridge WRITER claims real:
+# references/project-setup/statusline.sh resolves the same way (from
+# `.workspace.project_dir // .cwd` — a statusline payload has a `.workspace`,
+# a hook payload does not), and if writer and reader disagree they use
+# different .claude/state dirs and the nudge silently reads a bridge that
+# isn't there. The harness sets CLAUDE_PROJECT_DIR for hooks in both plain and
+# native-worktree (`claude --worktree`) sessions, so this only engages on a
+# host that omits it — the same embedded-surface case the log below exists to
+# detect. It needs jq, so a jq-less host without CLAUDE_PROJECT_DIR still
+# degrades to `.`; keeping that degradation is why the log below stays
+# reachable ahead of the jq guard.
+dir="${CLAUDE_PROJECT_DIR:-}"
+if [ -z "$dir" ] && command -v jq >/dev/null 2>&1; then
+  dir="$(jq -r '.cwd // ""' <<<"$input" 2>/dev/null || echo "")"
+fi
+if [ -z "$dir" ] || [ ! -d "$dir" ]; then dir="."; fi
 
 # Surface log: one line per unique host surface — (bundle id, execpath) pair —
 # that has ever run this hook, so "do plugin hooks fire in <host X>" (an IDE
@@ -110,9 +131,6 @@ command -v jq >/dev/null 2>&1 || exit 0
 state_file="$dir/.claude/state/context-usage.json"
 [ -f "$state_file" ] || exit 0
 
-# Hook payload arrives on stdin; the -t guard keeps a manual TTY run from hanging.
-input=""
-[ -t 0 ] || input="$(cat || true)"
 event="$(jq -r '.hook_event_name // ""' <<<"$input" 2>/dev/null || echo "")"
 
 # Cross-session guard: the bridge records which session's statusline wrote it.
