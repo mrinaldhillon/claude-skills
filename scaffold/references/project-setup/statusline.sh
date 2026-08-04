@@ -21,7 +21,9 @@ fi
 
 # Resolve the project dir the same way the nudge hook does — CLAUDE_PROJECT_DIR
 # first, payload fallback — so the bridge WRITER and its hook READER can never
-# disagree about which .claude/state they share.
+# disagree about which .claude/state they share. `.workspace.project_dir` is a
+# statusline-payload field; a hook payload has only `.cwd`, which is where the
+# reader's fallback lands (context-nudge.sh, scaffold >= 0.8.1).
 proj="${CLAUDE_PROJECT_DIR:-$(printf '%s' "$input" | jq -r '.workspace.project_dir // .cwd // "."')}"
 pct="$(printf '%s' "$input" | jq -r '.context_window.used_percentage // 0')"
 model="$(printf '%s' "$input" | jq -r '.model.display_name // "?"')"
