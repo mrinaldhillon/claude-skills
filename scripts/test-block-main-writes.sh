@@ -82,6 +82,7 @@ run deny  main "git merge feature"
 run deny  main "timeout 5 git push"
 run deny  main "git -C . commit -m x"
 run deny  main "merge --abort && git push"
+run deny  main "exec git push"          # `exec` is a wrapper word too
 # Allowed on main: non-advancing git, non-git, unquoted echo, state cleanup.
 run allow main "git status"
 run allow main "git merge --abort"
@@ -95,7 +96,9 @@ run allow work "git commit -m x"
 # The PR #238 shape: a correctly-routed worktree, both spellings. Used to deny.
 runc allow "$tmp" "git -C $wt commit -m x"
 runc allow "$tmp" "cd $wt && git commit -m x"
-runc allow "$tmp" "(cd $wt && git push)"
+# A cd inside parens is not an OPENING cd, so the target is undeterminable and
+# the guard refuses rather than guess. Conservative by design: put the cd first.
+runc deny "$tmp" "(cd $wt && git push)"
 # A native-worktree session (cwd IS the worktree) commits its own branch.
 runc allow "$wt" "git commit -m x"
 # `cwd` beats CLAUDE_PROJECT_DIR: cwd is the worktree, CLAUDE_PROJECT_DIR is main.
@@ -195,9 +198,10 @@ git push"
 runc deny "$wt" "cat <<EOF
 cd $tmp
 git push"
-# The converse must keep working: after the body closes, a `cd` to a worktree
-# on a branch is honoured again.
-runc allow "$tmp" "cat <<EOF
+# A `cd` after the body closes is a real one, but it is not the OPENING cd, and
+# this guard does not track where a heredoc ends. Undeterminable, so it denies.
+# The convention the message states -- put the cd first -- covers the real case.
+runc deny "$tmp" "cat <<EOF
 x
 EOF
 cd $wt
@@ -213,9 +217,9 @@ runc deny "$wt" "popd && git push"
 runc deny "$wt" "cd  $tmp && git push"
 # shellcheck disable=SC2016  # `$WT` must reach the hook UNEXPANDED.
 runc deny "$wt" 'git -C "$WT" push'
-# `pushd` moves the shell exactly like `cd`, so it must also be honoured when it
-# points somewhere legitimate — the fix is to READ it, not to blanket-deny.
-runc allow "$tmp" "pushd $wt && git push"
+# `pushd` is not the convention: one leading `cd` is. It moves the shell, so the
+# target is undeterminable and this denies with a message saying what to write.
+runc deny "$tmp" "pushd $wt && git push"
 
 # The heredoc delimiter is any word, not just an identifier. `<<\EOF` and
 # `<<9EOF` are ordinary spellings; a capture that missed them left the body
@@ -234,7 +238,7 @@ git push"
 # rejects it), and separators are split without evaluating control flow, so a
 # short-circuited `cd` is still credited — the one shape that under-denies.
 runc deny  "$tmp" "echo \"a; cd $wt\" && git push"
-runc allow "$tmp" "false && cd $wt; git push"
+runc deny  "$tmp" "false && cd $wt; git push"
 
 printf '\n'
 if [ "$fails" -eq 0 ]; then
